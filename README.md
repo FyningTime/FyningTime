@@ -11,4 +11,4 @@ Features which are planned:
 * By wish, the app starts/ends automatically by startup/shutdown and tracks beginning of your work day. (Next day you can review it anyway 😬)
 * Customize the app (e.g. primary/secondary colors)
 * Create a notification warning if you work too long! (It would be sad if you work too long. 😉)  
-for more see issues https://github.com/FyningTime/FyningTime/issues 
+for more see issues tagged as feature: https://github.com/FyningTime/FyningTime/issues?q=is%3Aopen+is%3Aissue+label%3Afeature
