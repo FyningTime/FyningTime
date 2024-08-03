@@ -1,0 +1,8 @@
+Website = "https://github.com/FyningTime"
+
+[Details]
+Icon = "icon.png"
+Name = "FyneTime"
+ID = "com.github.fynetime.fynetime"
+Version = "1.0.0"
+Build = 1
