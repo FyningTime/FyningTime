@@ -89,7 +89,7 @@ func (av *AppView) AddTimeEntry() {
 				entryHeader = "End"
 			}
 			av.headers = append(av.headers, entryHeader)
-			log.Info("Time updated:", "entry", entry)
+			log.Info("Time updated:", "work-time", entry)
 			break
 		}
 	}
@@ -105,7 +105,7 @@ func (av *AppView) AddTimeEntry() {
 			entryHeader = "End"
 		}
 		av.headers = append(av.headers, entryHeader)
-		log.Info("Time added:", "time-entry", te)
+		log.Info("Time added:", "work-day", te)
 	}
 
 	av.timetable.Refresh()
