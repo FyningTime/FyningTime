@@ -1,9 +1,13 @@
 package view
 
 import (
-	"fmt"
+	"database/sql"
 	"main/app/model"
+	"main/app/model/db"
+	"main/app/repo"
 	"time"
+
+	"github.com/charmbracelet/log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
@@ -20,6 +24,13 @@ type AppView struct {
 
 	// Represents the data entry for the timetable
 	timeEntries []*model.TimeEntry
+
+	// Actual db abstraction
+	worktime []*db.Worktime
+	workday  *db.Workday
+
+	// Holds the database connection
+	repo *repo.SQLiteRepository
 }
 
 func (av *AppView) CreateUI() *widget.Table {
@@ -71,13 +82,13 @@ func (av *AppView) AddTimeEntry() {
 		if entry.DATE.Day() == time.Now().Day() {
 			today = entry.AddTime(time.Now())
 			entrySize := len(entry.ENTRIES)
-			fmt.Println("Entry size: ", entrySize)
+			log.Debug("Entry:", "size", entrySize)
 			entryHeader := "Begin"
 			if entrySize%2 == 0 {
 				entryHeader = "End"
 			}
 			av.headers = append(av.headers, entryHeader)
-			fmt.Printf("Time updated %v\n", entry)
+			log.Info("Time updated:", "entry", entry)
 			break
 		}
 	}
@@ -87,13 +98,13 @@ func (av *AppView) AddTimeEntry() {
 		te.ENTRIES = append(te.ENTRIES, time.Now())
 		av.timeEntries = append(av.timeEntries, te)
 		entrySize := len(te.ENTRIES)
-		fmt.Println("Entry size: ", entrySize)
+		log.Debug("Entry", "size", entrySize)
 		entryHeader := "Begin"
 		if entrySize%2 == 0 {
 			entryHeader = "End"
 		}
 		av.headers = append(av.headers, entryHeader)
-		fmt.Printf("Time added %v\n", te)
+		log.Info("Time added:", "time-entry", te)
 	}
 
 	av.timetable.Refresh()
@@ -101,4 +112,15 @@ func (av *AppView) AddTimeEntry() {
 
 func (av *AppView) AddHeaders(headers []string) {
 	av.headers = headers
+}
+
+func (av *AppView) AddRepository(db *sql.DB) {
+	av.repo = repo.NewSQLiteRepository(db)
+
+	// On start we also try to migrate the database
+	log.Info("Migrating database")
+	err := av.repo.Migrate()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
