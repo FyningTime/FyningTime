@@ -39,6 +39,7 @@ func (av *AppView) CreateUI() *widget.Table {
 			return len(av.timeEntries) + 1, len(av.headers)
 		},
 		func() fyne.CanvasObject {
+			// Defines how wide the cell is
 			return widget.NewLabel("wide content")
 		},
 		func(i widget.TableCellID, o fyne.CanvasObject) {
