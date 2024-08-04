@@ -3,7 +3,6 @@ package view
 import (
 	"fmt"
 	"main/app/model"
-	"strconv"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -44,9 +43,12 @@ func (av *AppView) CreateUI() *widget.Table {
 				case 0:
 					label.SetText(entry.DATE.Format(time.DateOnly))
 				default:
-					entriesSize := len(entry.ENTRY)
+					entriesSize := len(entry.ENTRIES)
 					if entriesSize >= i.Col {
-						label.SetText(entry.ENTRY[i.Col-1].Format(time.TimeOnly))
+						if entriesSize%2 != 0 && i.Col%2 != 0 {
+							label.Importance = widget.HighImportance
+						}
+						label.SetText(entry.ENTRIES[i.Col-1].Format(time.TimeOnly))
 					}
 				}
 			}
@@ -68,9 +70,13 @@ func (av *AppView) AddTimeEntry() {
 		entry := entries[i]
 		if entry.DATE.Day() == time.Now().Day() {
 			today = entry.AddTime(time.Now())
-			entrySize := len(entry.ENTRY)
+			entrySize := len(entry.ENTRIES)
 			fmt.Println("Entry size: ", entrySize)
-			av.headers = append(av.headers, "Entry #"+strconv.Itoa(entrySize))
+			entryHeader := "Begin"
+			if entrySize%2 == 0 {
+				entryHeader = "End"
+			}
+			av.headers = append(av.headers, entryHeader)
 			fmt.Printf("Time updated %v\n", entry)
 			break
 		}
@@ -78,11 +84,15 @@ func (av *AppView) AddTimeEntry() {
 
 	if today == nil {
 		te := model.New()
-		te.ENTRY = append(te.ENTRY, time.Now())
+		te.ENTRIES = append(te.ENTRIES, time.Now())
 		av.timeEntries = append(av.timeEntries, te)
-		entrySize := len(te.ENTRY)
+		entrySize := len(te.ENTRIES)
 		fmt.Println("Entry size: ", entrySize)
-		av.headers = append(av.headers, "Entry #"+strconv.Itoa(entrySize))
+		entryHeader := "Begin"
+		if entrySize%2 == 0 {
+			entryHeader = "End"
+		}
+		av.headers = append(av.headers, entryHeader)
 		fmt.Printf("Time added %v\n", te)
 	}
 

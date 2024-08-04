@@ -9,21 +9,21 @@ type TimeEntry struct {
 	DATE time.Time `json:"date"`
 
 	// List of time entries
-	ENTRY []time.Time `json:"entry"`
+	ENTRIES []time.Time `json:"entries"`
 }
 
 func (t *TimeEntry) AddTime(time time.Time) *TimeEntry {
-	t.ENTRY = append(t.ENTRY, time)
+	t.ENTRIES = append(t.ENTRIES, time)
 	return t
 }
 
 func (t *TimeEntry) Size() int {
-	return len(t.ENTRY)
+	return len(t.ENTRIES)
 }
 
 func New() *TimeEntry {
 	return &TimeEntry{
-		DATE:  time.Now(),
-		ENTRY: []time.Time{},
+		DATE:    time.Now(),
+		ENTRIES: []time.Time{},
 	}
 }
