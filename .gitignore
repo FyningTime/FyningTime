@@ -21,3 +21,6 @@
 go.work
 go.work.sum
 idea/
+
+# local project files
+fyningtime*
