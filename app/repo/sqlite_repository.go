@@ -3,9 +3,10 @@ package repo
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"main/app/model/db"
 	"time"
+
+	"github.com/charmbracelet/log"
 )
 
 var (
@@ -26,6 +27,7 @@ func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
 }
 
 func (r *SQLiteRepository) Migrate() error {
+	// TODO might be a good idea to move this to a separate file with history table
 	query := `
     CREATE TABLE IF NOT EXISTS workday(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +37,8 @@ func (r *SQLiteRepository) Migrate() error {
 	CREATE TABLE IF NOT EXISTS worktime(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		type TEXT NOT NULL,
-		time DATETIME NOT NULL,
+		time DATETIME DEFAULT CURRENT_TIMESTAMP,
+		breaktime DATETIME,
 		workday INTEGER,
 		FOREIGN KEY(workday) REFERENCES workday(id)
 	);
@@ -45,9 +48,10 @@ func (r *SQLiteRepository) Migrate() error {
 	return err
 }
 
-func (r *SQLiteRepository) AddWorkday(workday db.Workday) (*db.Workday, error) {
-	query := `INSERT INTO workday(null, date) VALUES(?)`
-	res, err := r.db.Exec(query, workday.Date)
+func (r *SQLiteRepository) AddWorkday(workday *db.Workday) (*db.Workday, error) {
+	log.Info("Adding workday", "date", workday.Date)
+	query := `INSERT INTO workday(date) VALUES(?)`
+	res, err := r.db.Exec(query, workday.Date.Format(time.DateOnly))
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +64,13 @@ func (r *SQLiteRepository) AddWorkday(workday db.Workday) (*db.Workday, error) {
 
 	workday.ID = id
 
-	return &workday, nil
+	return workday, nil
 }
 
-func (r *SQLiteRepository) AddWorktime(worktime db.Worktime) (*db.Worktime, error) {
-	query := `INSERT INTO worktime(null, type, time, workday) VALUES(?, ?, ?)`
-	res, err := r.db.Exec(query, worktime.Type, worktime.Time)
+func (r *SQLiteRepository) AddWorktime(worktime *db.Worktime) (*db.Worktime, error) {
+	log.Info("Adding worktime", "type", worktime.Type, "time", worktime.Time)
+	query := `INSERT INTO worktime(type, workday) VALUES(?, ?)`
+	res, err := r.db.Exec(query, worktime.Type, worktime.Workday.ID)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
@@ -77,23 +82,51 @@ func (r *SQLiteRepository) AddWorktime(worktime db.Worktime) (*db.Worktime, erro
 	}
 
 	worktime.ID = id
-	return &worktime, nil
+	return worktime, nil
 }
 
 func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
-	query := `SELECT id, date FROM workday WHERE date = ?`
+	log.Info("Getting workday", "date", date)
+	query := `SELECT id, date from workday WHERE date = ?`
 	var workday db.Workday
 
-	err := r.db.QueryRow(query, date).Scan(&workday.ID, &workday.Date)
+	err := r.db.QueryRow(query, date.Format(time.DateOnly)).Scan(&workday.ID, &workday.Date)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	return &workday, nil
 }
 
-func (r *SQLiteRepository) GetAllWorktime(workday db.Workday) ([]db.Worktime, error) {
+func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
+	log.Info("Getting all workdays")
+	query := `SELECT id, date FROM workday`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var workday []*db.Workday
+	for rows.Next() {
+		var w db.Workday
+		err := rows.Scan(&w.ID, &w.Date)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+
+		log.Debug("Workday", "id", w.ID, "date", w.Date)
+		workday = append(workday, &w)
+	}
+
+	return workday, nil
+}
+
+func (r *SQLiteRepository) GetAllWorktime(workday *db.Workday) ([]*db.Worktime, error) {
+	log.Info("Getting all worktimes", "workday-id", workday.ID)
 	query := `SELECT id, type, time, workday FROM worktime WHERE workday = ?`
 
 	rows, err := r.db.Query(query, workday.ID)
@@ -102,17 +135,16 @@ func (r *SQLiteRepository) GetAllWorktime(workday db.Workday) ([]db.Worktime, er
 	}
 	defer rows.Close()
 
-	var worktime []db.Worktime
+	var worktimes []*db.Worktime
 	for rows.Next() {
 		var w db.Worktime
-		err := rows.Scan(&w)
+		err := rows.Scan(&w.ID, &w.Type, &w.Time, &w.Workday.ID)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
 			return nil, err
 		}
-
-		worktime = append(worktime, w)
+		worktimes = append(worktimes, &w)
 	}
-
-	return worktime, nil
+	log.Debug("worktimes", "size", len(worktimes))
+	return worktimes, nil
 }

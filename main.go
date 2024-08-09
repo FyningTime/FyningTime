@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"main/app/view"
 
 	"fyne.io/fyne/v2"
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	var devFlag bool
+	initLogging(devFlag)
+
 	progName := "FyningTime"
 	log.Info("Welcome to " + progName)
 
@@ -21,11 +25,14 @@ func main() {
 
 	//toolbar := view.toolbar.makeUI()
 	av := new(view.AppView)
-	// TODO get time entries from the database and pass them to the view
 	av.AddRepository(GetDB("fyningtime.db"))
 	// INFO Date is the basic header, for each entry a new header is added
 	av.AddHeaders([]string{"Date"})
+	av.InitData()
 	mv := av.CreateUI()
+	mv.OnSelected = func(id widget.TableCellID) {
+		log.Debug("Selected", "id", id)
+	}
 	//av.AddTimeEntry()
 
 	// TODO move btn to main view
@@ -33,8 +40,8 @@ func main() {
 		av.AddTimeEntry()
 	})
 
-	w.Resize(fyne.NewSize(1000, 500))
 	w.SetContent(container.NewVSplit(btn, mv))
+	w.Resize(fyne.NewSize(800, 600))
 	w.ShowAndRun()
 }
 
@@ -45,4 +52,13 @@ func GetDB(filePath string) *sql.DB {
 		log.Fatal(err)
 	}
 	return db
+}
+
+func initLogging(devFlag bool) {
+	flag.BoolVar(&devFlag, "d", false, "Development flag")
+	flag.Parse()
+	if devFlag {
+		log.Info("Development mode enabled")
+		log.SetLevel(log.DebugLevel)
+	}
 }
