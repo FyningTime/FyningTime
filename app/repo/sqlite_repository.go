@@ -148,3 +148,30 @@ func (r *SQLiteRepository) GetAllWorktime(workday *db.Workday) ([]*db.Worktime, 
 	log.Debug("worktimes", "size", len(worktimes))
 	return worktimes, nil
 }
+
+func (r *SQLiteRepository) DeleteWorktime(worktime *db.Worktime) (int64, error) {
+	log.Info("Deleting worktime", "worktime-id", worktime.ID)
+	query := `DELETE FROM worktime WHERE id = ?`
+
+	res, err := r.db.Exec(query, worktime.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) DeleteWorkday(workday *db.Workday) (int64, error) {
+	log.Info("Deleting workday", "workday-id", workday.ID)
+	queryDeleteWorktimes := `DELETE FROM worktime WHERE workday = ?`
+	resWt, errWt := r.db.Exec(queryDeleteWorktimes, workday.ID)
+	if errWt == nil {
+		query := `DELETE FROM workday WHERE id = ?`
+		resWd, errWd := r.db.Exec(query, workday.ID)
+		log.Error(errWd)
+		return resWd.RowsAffected()
+	} else {
+		return resWt.RowsAffected()
+	}
+
+}
