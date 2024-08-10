@@ -87,7 +87,7 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 				if i.Col-1 < len(wtday) {
 					currentWt := wtday[i.Col-1]
 					workType := " (" + currentWt.Type + ") "
-					label.SetText(currentWt.Time.Local().Format(time.TimeOnly) + workType)
+					label.SetText(currentWt.Time.Format(time.TimeOnly) + workType)
 				} else {
 					label.SetText("")
 				}
@@ -103,13 +103,19 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 	tt.OnSelected = func(id widget.TableCellID) {
 		av.selectedItem = &id
 	}
+	tt.Resize(fyne.NewSize(1000, 600))
 	av.timetable = tt
 
 	btnAddTimeToolbarItem := widget.NewToolbarAction(theme.ContentAddIcon(), av.AddTimeEntry)
 	btnDeleteTimeToolbarItem := widget.NewToolbarAction(theme.ContentRemoveIcon(), av.deleteButtonFunc)
+	btnEditTimeToolbarItem := widget.NewToolbarAction(theme.ContentCutIcon(), av.editButtonFunc)
 
-	timeToolbar := widget.NewToolbar(btnAddTimeToolbarItem, btnDeleteTimeToolbarItem)
-	return container.NewVSplit(timeToolbar, tt)
+	timeToolbar := widget.NewToolbar(btnAddTimeToolbarItem,
+		btnDeleteTimeToolbarItem, btnEditTimeToolbarItem)
+
+	cnt := container.NewVSplit(timeToolbar, tt)
+	cnt.Resize(fyne.NewSize(1000, 600))
+	return cnt
 }
 
 func (av *AppView) AddTimeEntry() {
@@ -170,16 +176,18 @@ func (av *AppView) deleteButtonFunc() {
 		return
 	} else if av.selectedItem.Col == 0 {
 		dialog.ShowConfirm("Delete Entry", "Do you really want to delete this workday?", func(b bool) {
-			// Delete the whole day
-			wd := av.workday[av.selectedItem.Row]
-			log.Info("Delete workday", "workday", wd)
-			// Deletion here
-			rows, err := av.repo.DeleteWorkday(wd)
-			if rows != 0 || err == nil {
-				// Refresh *all data*
-				av.refreshAll()
-			} else {
-				dialog.ShowError(errors.New("could not delete dataset"), av.window)
+			if b {
+				// Delete the whole day
+				wd := av.workday[av.selectedItem.Row]
+				log.Info("Delete workday", "workday", wd)
+				// Deletion here
+				rows, err := av.repo.DeleteWorkday(wd)
+				if rows != 0 || err == nil {
+					// Refresh *all data*
+					av.refreshAll()
+				} else {
+					dialog.ShowError(errors.New("could not delete dataset"), av.window)
+				}
 			}
 		}, av.window)
 	} else {
@@ -208,7 +216,7 @@ func (av *AppView) AddHeaders(headers []string) {
 	av.headers = headers
 }
 
-func (av *AppView) AddRepository(db *sql.DB) {
+func (av *AppView) CreateRepository(db *sql.DB) {
 	av.repo = repo.NewSQLiteRepository(db)
 
 	// On start we also try to migrate the database
@@ -284,4 +292,58 @@ Combines the refresh of the data and the timetable
 func (av *AppView) refreshAll() {
 	av.RefreshData()
 	av.timetable.Refresh()
+}
+
+func (av *AppView) UnselectTableItem() {
+	if av.selectedItem != nil {
+		log.Debug("Unselect item", "item", av.selectedItem)
+		av.timetable.Unselect(*av.selectedItem)
+	} else {
+		dialog.ShowError(errors.New("no item selected"), av.window)
+	}
+}
+
+func (av *AppView) editButtonFunc() {
+	log.Info("Edit time entry", "item", av.selectedItem)
+	// Check if is a day or a time entry selected
+	// Assure that there is an item selected
+	if av.selectedItem == nil || av.selectedItem.Col == 0 {
+		dialog.ShowError(errors.New("no time selected"), av.window)
+		return
+	}
+	wt, err := av.getTimeEntry(av.selectedItem)
+
+	if wt != nil && err == nil {
+		form := []*widget.FormItem{
+			{Text: "Time (hh:mm:ss)", Widget: widget.NewEntry(), HintText: "Example: " + wt.Time.Format(time.TimeOnly)},
+		}
+		// Edit only if there is an existing item and no error
+		log.Debug("Edit time entry", "worktime", wt)
+		dia := dialog.NewForm("Edit Time Entry", "Edit", "Cancel", form, func(b bool) {
+			if b {
+				log.Debug("Edit time entry", "confirmed", b, "worktime", wt)
+				// Parse the time
+				t, err := time.Parse(time.TimeOnly, form[0].Widget.(*widget.Entry).Text)
+				log.Debug("Edit time entry", "new-value", t)
+				if err != nil {
+					dialog.ShowError(err, av.window)
+					return
+				} else {
+					// Update the time entry
+					wt.Time = t
+					_, err := av.repo.UpdateWorktime(wt)
+					if err != nil {
+						dialog.ShowError(err, av.window)
+					} else {
+						// Refresh *all data*
+						av.refreshAll()
+					}
+				}
+			}
+		}, av.window)
+		dia.Resize(fyne.NewSize(400, 200))
+		dia.Show()
+	} else {
+		dialog.ShowError(errors.New("no item selected"), av.window)
+	}
 }

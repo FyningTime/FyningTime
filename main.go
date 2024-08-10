@@ -23,21 +23,27 @@ func main() {
 	a := app.NewWithID("com.github.fyningtime.fyningtime")
 	w := a.NewWindow(progName)
 
-	//toolbar := view.toolbar.makeUI()
 	av := new(view.AppView)
-	av.AddRepository(GetDB("fyningtime.db"))
+	av.CreateRepository(GetDB("fyningtime.db"))
 	// INFO Date is the basic header, for each entry a new header is added
 	av.AddHeaders([]string{"Date"})
 	av.RefreshData()
 	mv := av.CreateUI(w)
-	//av.AddTimeEntry()
+
+	setShortcuts(w, av.UnselectTableItem)
 
 	// TODO implement me usefully!
 	if desk, ok := a.(desktop.App); ok {
 		m := fyne.NewMenu("FyneTime",
 			fyne.NewMenuItem("Without function yet", func() {
 				log.Info("Tapped show")
-			}))
+			}),
+			fyne.NewMenuItem("About", func() {
+				dialog.ShowInformation("About",
+					"FyneTime is a simple time tracking application", w)
+			}),
+		)
+
 		desk.SetSystemTrayMenu(m)
 	}
 
@@ -72,4 +78,15 @@ func initLogging(devFlag bool) {
 		log.Info("Development mode enabled")
 		log.SetLevel(log.DebugLevel)
 	}
+}
+
+func setShortcuts(w fyne.Window, callbackShiftDelete func()) {
+	// Shortcut for shift+del
+	log.Info("Setting up shortcuts")
+	deleteShortcut := &desktop.CustomShortcut{KeyName: fyne.KeyDelete,
+		Modifier: fyne.KeyModifierShift}
+	w.Canvas().AddShortcut(deleteShortcut, func(shortcut fyne.Shortcut) {
+		log.Info("Tapped shift+del")
+		callbackShiftDelete()
+	})
 }
