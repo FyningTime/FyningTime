@@ -323,7 +323,19 @@ func (av *AppView) editButtonFunc() {
 			if b {
 				log.Debug("Edit time entry", "confirmed", b, "worktime", wt)
 				// Parse the time
-				t, err := time.Parse(time.TimeOnly, form[0].Widget.(*widget.Entry).Text)
+				timeEntry := form[0].Widget.(*widget.Entry).Text
+
+				if timeEntry == "" {
+					dialog.ShowError(errors.New("no time entry"), av.window)
+					return
+				}
+
+				t, err := time.Parse(time.TimeOnly, timeEntry)
+				// The edit shouldn't be in future, it would be faking and does not make sense
+				if time.Now().After(t) {
+					dialog.ShowError(errors.New("time is in the future, do not fake 😉"), av.window)
+					return
+				}
 				log.Debug("Edit time entry", "new-value", t)
 				if err != nil {
 					dialog.ShowError(err, av.window)
