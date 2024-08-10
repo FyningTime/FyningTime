@@ -314,8 +314,10 @@ func (av *AppView) editButtonFunc() {
 	wt, err := av.getTimeEntry(av.selectedItem)
 
 	if wt != nil && err == nil {
+		entry := widget.NewEntry()
+		entry.SetText(time.Now().Format(time.TimeOnly))
 		form := []*widget.FormItem{
-			{Text: "Time (hh:mm:ss)", Widget: widget.NewEntry(), HintText: "Example: " + wt.Time.Format(time.TimeOnly)},
+			{Text: "Time (hh:mm:ss)", Widget: entry, HintText: "Old entry: " + wt.Time.Format(time.TimeOnly)},
 		}
 		// Edit only if there is an existing item and no error
 		log.Debug("Edit time entry", "worktime", wt)
