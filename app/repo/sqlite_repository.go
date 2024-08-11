@@ -37,7 +37,7 @@ func (r *SQLiteRepository) Migrate() error {
 	CREATE TABLE IF NOT EXISTS worktime(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		type TEXT NOT NULL,
-		time DATETIME DEFAULT CURRENT_TIMESTAMP,
+		time DATETIME DEFAULT (datetime('now', 'localtime')),
 		breaktime DATETIME,
 		workday INTEGER,
 		FOREIGN KEY(workday) REFERENCES workday(id)
@@ -87,7 +87,7 @@ func (r *SQLiteRepository) AddWorktime(worktime *db.Worktime) (*db.Worktime, err
 
 func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	log.Info("Getting workday", "date", date)
-	query := `SELECT id, date from workday WHERE date = ?`
+	query := `SELECT id, date from workday WHERE date = ? ORDER BY date DESC LIMIT 1`
 	var workday db.Workday
 
 	err := r.db.QueryRow(query, date.Format(time.DateOnly)).Scan(&workday.ID, &workday.Date)
@@ -101,7 +101,7 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 
 func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
 	log.Info("Getting all workdays")
-	query := `SELECT id, date FROM workday`
+	query := `SELECT id, date FROM workday ORDER BY date DESC`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -147,4 +147,42 @@ func (r *SQLiteRepository) GetAllWorktime(workday *db.Workday) ([]*db.Worktime, 
 	}
 	log.Debug("worktimes", "size", len(worktimes))
 	return worktimes, nil
+}
+
+func (r *SQLiteRepository) DeleteWorktime(worktime *db.Worktime) (int64, error) {
+	log.Info("Deleting worktime", "worktime-id", worktime.ID)
+	query := `DELETE FROM worktime WHERE id = ?`
+
+	res, err := r.db.Exec(query, worktime.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) DeleteWorkday(workday *db.Workday) (int64, error) {
+	log.Info("Deleting workday", "workday-id", workday.ID)
+	queryDeleteWorktimes := `DELETE FROM worktime WHERE workday = ?`
+	resWt, errWt := r.db.Exec(queryDeleteWorktimes, workday.ID)
+	if errWt == nil {
+		query := `DELETE FROM workday WHERE id = ?`
+		resWd, _ := r.db.Exec(query, workday.ID)
+		return resWd.RowsAffected()
+	} else {
+		return resWt.RowsAffected()
+	}
+
+}
+
+func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) {
+	log.Info("Updating worktime", "worktime-id", worktime.ID)
+	query := `UPDATE worktime SET type = ?, time = ?, breaktime = ? WHERE id = ?`
+
+	res, err := r.db.Exec(query, worktime.Type, worktime.Time, worktime.Breaktime, worktime.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
 }
