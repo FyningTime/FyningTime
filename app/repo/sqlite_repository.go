@@ -38,7 +38,6 @@ func (r *SQLiteRepository) Migrate() error {
 	CREATE TABLE IF NOT EXISTS worktime(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		type TEXT NOT NULL,
-		time DATETIME DEFAULT (datetime('now', 'localtime')),
 		workday INTEGER,
 		FOREIGN KEY(workday) REFERENCES workday(id)
 	);
