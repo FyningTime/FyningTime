@@ -31,14 +31,13 @@ func (r *SQLiteRepository) Migrate() error {
 	query := `
     CREATE TABLE IF NOT EXISTS workday(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date DATETIME NOT NULL UNIQUE
+        date DATETIME NOT NULL UNIQUE,
+		breaktime DATETIME DEFAULT '00:30:00'
     );
 
 	CREATE TABLE IF NOT EXISTS worktime(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		type TEXT NOT NULL,
-		time DATETIME DEFAULT (datetime('now', 'localtime')),
-		breaktime DATETIME,
 		workday INTEGER,
 		FOREIGN KEY(workday) REFERENCES workday(id)
 	);
@@ -69,8 +68,8 @@ func (r *SQLiteRepository) AddWorkday(workday *db.Workday) (*db.Workday, error) 
 
 func (r *SQLiteRepository) AddWorktime(worktime *db.Worktime) (*db.Worktime, error) {
 	log.Info("Adding worktime", "type", worktime.Type, "time", worktime.Time)
-	query := `INSERT INTO worktime(type, workday) VALUES(?, ?)`
-	res, err := r.db.Exec(query, worktime.Type, worktime.Workday.ID)
+	query := `INSERT INTO worktime(type, workday, time) VALUES(?, ?, ?)`
+	res, err := r.db.Exec(query, worktime.Type, worktime.Workday.ID, worktime.Time)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
@@ -129,6 +128,8 @@ func (r *SQLiteRepository) GetAllWorktime(workday *db.Workday) ([]*db.Worktime, 
 	log.Info("Getting all worktimes", "workday-id", workday.ID)
 	query := `SELECT id, type, time, workday FROM worktime WHERE workday = ?`
 
+	loc, _ := time.LoadLocation("Europe/Berlin")
+
 	rows, err := r.db.Query(query, workday.ID)
 	if err != nil {
 		return nil, err
@@ -138,7 +139,9 @@ func (r *SQLiteRepository) GetAllWorktime(workday *db.Workday) ([]*db.Worktime, 
 	var worktimes []*db.Worktime
 	for rows.Next() {
 		var w db.Worktime
-		err := rows.Scan(&w.ID, &w.Type, &w.Time, &w.Workday.ID)
+		tmpTime := w.Time.In(loc)
+		err := rows.Scan(&w.ID, &w.Type, &tmpTime, &w.Workday.ID)
+		w.Time = tmpTime
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -179,7 +182,9 @@ func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) 
 	log.Info("Updating worktime", "worktime-id", worktime.ID)
 	query := `UPDATE worktime SET type = ?, time = ?, breaktime = ? WHERE id = ?`
 
-	res, err := r.db.Exec(query, worktime.Type, worktime.Time, worktime.Breaktime, worktime.ID)
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	tmpTime := worktime.Time.In(loc)
+	res, err := r.db.Exec(query, worktime.Type, tmpTime, worktime.Breaktime, worktime.ID)
 	if err != nil {
 		log.Error(err)
 		return 0, err

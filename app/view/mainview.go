@@ -120,11 +120,12 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 
 func (av *AppView) AddTimeEntry() {
 	// Add a time entry to current date
-	today, err := av.repo.GetWorkday(time.Now())
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	today, err := av.repo.GetWorkday(time.Now().In(loc))
 	if today == nil && err != nil {
 		log.Debug("Create new workday")
 		w := &db.Workday{
-			Date: time.Now(),
+			Date: time.Now().In(loc),
 		}
 		newWd, wdErr := av.repo.AddWorkday(w)
 		if wdErr != nil {
@@ -133,7 +134,7 @@ func (av *AppView) AddTimeEntry() {
 			av.workday = append(av.workday, newWd)
 			wt := &db.Worktime{
 				Type:    "Begin", // As it is a new workday, it is always a begin
-				Time:    time.Now(),
+				Time:    time.Now().In(loc),
 				Workday: *newWd,
 			}
 
@@ -157,7 +158,7 @@ func (av *AppView) AddTimeEntry() {
 
 			wt := &db.Worktime{
 				Type:    wtType,
-				Time:    time.Now(),
+				Time:    time.Now().In(loc),
 				Workday: *today,
 			}
 			av.repo.AddWorktime(wt)
@@ -249,13 +250,13 @@ func (av *AppView) RefreshData() {
 }
 
 func (av *AppView) getTimeEntry(item *widget.TableCellID) (*db.Worktime, error) {
-	log.Info("Delete time entry", "item", item)
+	log.Info("Get time entry", "item", item)
 	if item == nil {
 		return nil, errors.New("no item selected")
 	}
 	// Get the affacted workday by row
 	wd := av.workday[av.selectedItem.Row]
-	log.Debug("Delete time entry", "workday", wd)
+	log.Debug("Get time entry", "workday", wd)
 
 	// Get all worktimes for this workday
 	var wtList []*db.Worktime
@@ -304,6 +305,8 @@ func (av *AppView) UnselectTableItem() {
 }
 
 func (av *AppView) editButtonFunc() {
+	loc, _ := time.LoadLocation("Europe/Berlin")
+
 	log.Info("Edit time entry", "item", av.selectedItem)
 	// Check if is a day or a time entry selected
 	// Assure that there is an item selected
@@ -314,10 +317,15 @@ func (av *AppView) editButtonFunc() {
 	wt, err := av.getTimeEntry(av.selectedItem)
 
 	if wt != nil && err == nil {
-		entry := widget.NewEntry()
-		entry.SetText(time.Now().Format(time.TimeOnly))
+		timeEntry := widget.NewEntry()
+		timeEntry.SetText(time.Now().In(loc).Format(time.TimeOnly))
+
+		typeEntry := widget.NewSelectEntry([]string{"Begin", "End"})
+		typeEntry.SetText(wt.Type)
+
 		form := []*widget.FormItem{
-			{Text: "Time (hh:mm:ss)", Widget: entry, HintText: "Old entry: " + wt.Time.Format(time.TimeOnly)},
+			{Text: "Time (hh:mm:ss)", Widget: timeEntry, HintText: "Old entry: " + wt.Time.Format(time.TimeOnly)},
+			{Text: "Type", Widget: typeEntry, HintText: "Old entry: " + wt.Type},
 		}
 		// Edit only if there is an existing item and no error
 		log.Debug("Edit time entry", "worktime", wt)
@@ -332,26 +340,50 @@ func (av *AppView) editButtonFunc() {
 					return
 				}
 
-				t, err := time.Parse(time.TimeOnly, timeEntry)
-				// The edit shouldn't be in future, it would be faking and does not make sense
-				if time.Now().After(t) {
-					dialog.ShowError(errors.New("time is in the future, do not fake 😉"), av.window)
-					return
-				}
-				log.Debug("Edit time entry", "new-value", t)
+				// Add the current date to the updated time entry
+				tempTime := time.Now().In(loc).Format(time.DateOnly) + " " + timeEntry
+				nt, err := time.ParseInLocation(time.DateTime, tempTime, loc)
 				if err != nil {
 					dialog.ShowError(err, av.window)
 					return
-				} else {
-					// Update the time entry
-					wt.Time = t
-					_, err := av.repo.UpdateWorktime(wt)
+				}
+				log.Info("New time", "time", nt)
+
+				prevCol := widget.TableCellID{Row: av.selectedItem.Row, Col: av.selectedItem.Col - 1} // -1 because of the date column
+				if prevCol.Col >= 1 {                                                                 // If there is a previous entry
+					prevTime, err := av.getTimeEntry(&prevCol)
+					log.Debug("Previous time", "time", prevTime.Time)
 					if err != nil {
 						dialog.ShowError(err, av.window)
+						return
 					} else {
-						// Refresh *all data*
-						av.refreshAll()
+						// The edit shouldn't be before the previous entry
+						log.Debug("Compare new-time with prev-time", "new-time", nt, "prev-time", prevTime.Time)
+						if nt.Before(prevTime.Time) {
+							dialog.ShowError(errors.New("time is before previous entry"), av.window)
+							return
+						}
 					}
+				}
+
+				// The edit shouldn't be in future, it would be faking and does not make sense
+				ct := time.Now().In(loc)
+				log.Debug("Compare new-time with current-time", "new-time", nt, "current-time", ct)
+				if ct.Before(nt) {
+					dialog.ShowError(errors.New("time is in the future, do not fake 😉"), av.window)
+					return
+				}
+
+				// Update the time entry
+				wt.Time = nt
+				wt.Type = form[1].Widget.(*widget.SelectEntry).Text
+
+				_, errUpdate := av.repo.UpdateWorktime(wt)
+				if errUpdate != nil {
+					dialog.ShowError(err, av.window)
+				} else {
+					// Refresh *all data*
+					av.refreshAll()
 				}
 			}
 		}, av.window)
