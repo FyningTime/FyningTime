@@ -3,10 +3,10 @@ package view
 import (
 	"database/sql"
 	"errors"
-	"main/app/model/db"
-	"main/app/repo"
-	"strconv"
 	"time"
+
+	"github.com/FyningTime/FyningTime/app/model/db"
+	"github.com/FyningTime/FyningTime/app/repo"
 
 	"github.com/charmbracelet/log"
 
@@ -16,6 +16,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
+
+const extraColumns = 2 // Date and Time/Breaktime
 
 type AppView struct {
 	// Holds the main window
@@ -63,11 +65,11 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 				}
 			}
 
-			return len(av.workday), longestDay + 1 // +1 for the date row
+			return len(av.workday), longestDay + extraColumns // +1 for the date row
 		},
 		func() fyne.CanvasObject {
 			// Defines how wide the cell is
-			return widget.NewLabel("15:03:21 (Begin)")
+			return widget.NewLabel("10h54m18s / 45m0s xxxx")
 		},
 		func(i widget.TableCellID, o fyne.CanvasObject) {
 			label := o.(*widget.Label)
@@ -82,12 +84,18 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 
 			if i.Col == 0 {
 				label.SetText(wd.Date.Format(time.DateOnly) +
-					" id: " + strconv.FormatInt(wd.ID, 10))
+					" / " + wd.Date.Weekday().String())
+				label.TextStyle = fyne.TextStyle{Bold: true}
+			} else if i.Col == 1 {
+				label.SetText(wd.Time + " / " + wd.Breaktime)
+				label.TextStyle = fyne.TextStyle{Bold: false}
 			} else {
-				if i.Col-1 < len(wtday) {
-					currentWt := wtday[i.Col-1]
+				if i.Col-extraColumns < len(wtday) {
+					currentWt := wtday[i.Col-extraColumns]
 					workType := " (" + currentWt.Type + ") "
 					label.SetText(currentWt.Time.Format(time.TimeOnly) + workType)
+					label.TextStyle = fyne.TextStyle{Bold: false}
+					//label.Theme().Color()
 				} else {
 					label.SetText("")
 				}
@@ -108,24 +116,29 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 
 	btnAddTimeToolbarItem := widget.NewToolbarAction(theme.ContentAddIcon(), av.AddTimeEntry)
 	btnDeleteTimeToolbarItem := widget.NewToolbarAction(theme.ContentRemoveIcon(), av.deleteButtonFunc)
-	btnEditTimeToolbarItem := widget.NewToolbarAction(theme.ContentCutIcon(), av.editButtonFunc)
+	btnEditTimeToolbarItem := widget.NewToolbarAction(theme.StorageIcon(), av.editButtonFunc)
 
 	timeToolbar := widget.NewToolbar(btnAddTimeToolbarItem,
 		btnDeleteTimeToolbarItem, btnEditTimeToolbarItem)
 
 	cnt := container.NewVSplit(timeToolbar, tt)
 	cnt.Resize(fyne.NewSize(1000, 600))
+
+	//cnt := NewResponsiveLayout(timeToolbar, tt)
+
+	go av.calculateBreak()
 	return cnt
 }
 
 func (av *AppView) AddTimeEntry() {
 	// Add a time entry to current date
 	loc, _ := time.LoadLocation("Europe/Berlin")
-	today, err := av.repo.GetWorkday(time.Now().In(loc))
+	today, err := av.repo.GetWorkday(time.Now())
+	log.Debug("Weekday", "weekday", time.Now().Weekday())
 	if today == nil && err != nil {
 		log.Debug("Create new workday")
 		w := &db.Workday{
-			Date: time.Now().In(loc),
+			Date: time.Now(),
 		}
 		newWd, wdErr := av.repo.AddWorkday(w)
 		if wdErr != nil {
@@ -169,48 +182,13 @@ func (av *AppView) AddTimeEntry() {
 	av.refreshAll()
 }
 
-func (av *AppView) deleteButtonFunc() {
-	log.Info("Delete time entry", "item", av.selectedItem)
-	// Check if is a day or a time entry selected
-	if av.selectedItem == nil {
-		dialog.ShowError(errors.New("no item selected"), av.window)
-		return
-	} else if av.selectedItem.Col == 0 {
-		dialog.ShowConfirm("Delete Entry", "Do you really want to delete this workday?", func(b bool) {
-			if b {
-				// Delete the whole day
-				wd := av.workday[av.selectedItem.Row]
-				log.Info("Delete workday", "workday", wd)
-				// Deletion here
-				rows, err := av.repo.DeleteWorkday(wd)
-				if rows != 0 || err == nil {
-					// Refresh *all data*
-					av.refreshAll()
-				} else {
-					dialog.ShowError(errors.New("could not delete dataset"), av.window)
-				}
-			}
-		}, av.window)
+func (av *AppView) UnselectTableItem() {
+	if av.selectedItem != nil {
+		log.Debug("Unselect item", "item", av.selectedItem)
+		av.timetable.Unselect(*av.selectedItem)
 	} else {
-		// Assure that there is an item selected
-		wt, err := av.getTimeEntry(av.selectedItem)
-
-		// Delete only if there is an existing item and no error
-		// Else show an error dialog
-		if wt != nil && err == nil {
-			dialog.ShowConfirm("Delete Entry", "Do you really want to delete this time entry?", func(b bool) {
-				if b {
-					defer av.deleteTimeEntry(wt)
-
-				} else {
-					log.Debug("Delete time entry", "canceled", b)
-				}
-			}, av.window)
-		} else {
-			dialog.ShowError(errors.New("no item selected"), av.window)
-		}
+		dialog.ShowError(errors.New("no item selected"), av.window)
 	}
-
 }
 
 func (av *AppView) AddHeaders(headers []string) {
@@ -249,6 +227,54 @@ func (av *AppView) RefreshData() {
 	}
 }
 
+// ------------------ Private functions ------------------
+
+func (av *AppView) deleteButtonFunc() {
+	log.Info("Delete time entry", "item", av.selectedItem)
+	// Check if is a day or a time entry selected
+	if av.selectedItem == nil {
+		dialog.ShowError(errors.New("no item selected"), av.window)
+		return
+	} else if av.selectedItem.Col == 0 {
+		dialog.ShowConfirm("Delete Entry", "Do you really want to delete this workday?", func(b bool) {
+			if b {
+				// Delete the whole day
+				wd := av.workday[av.selectedItem.Row]
+				log.Info("Delete workday", "workday", wd)
+				// Deletion here
+				rows, err := av.repo.DeleteWorkday(wd)
+				if rows != 0 || err == nil {
+					// Refresh *all data*
+					av.refreshAll()
+				} else {
+					dialog.ShowError(errors.New("could not delete dataset"), av.window)
+				}
+			}
+		}, av.window)
+	} else if av.selectedItem.Col == 1 {
+		dialog.ShowError(errors.New("no time selected"), av.window)
+	} else {
+		// Assure that there is an item selected
+		wt, err := av.getTimeEntry(av.selectedItem)
+
+		// Delete only if there is an existing item and no error
+		// Else show an error dialog
+		if wt != nil && err == nil {
+			dialog.ShowConfirm("Delete Entry", "Do you really want to delete this time entry?", func(b bool) {
+				if b {
+					defer av.deleteTimeEntry(wt)
+
+				} else {
+					log.Debug("Delete time entry", "canceled", b)
+				}
+			}, av.window)
+		} else {
+			dialog.ShowError(errors.New("no item selected"), av.window)
+		}
+	}
+
+}
+
 func (av *AppView) getTimeEntry(item *widget.TableCellID) (*db.Worktime, error) {
 	log.Info("Get time entry", "item", item)
 	if item == nil {
@@ -267,40 +293,11 @@ func (av *AppView) getTimeEntry(item *widget.TableCellID) (*db.Worktime, error) 
 		}
 	}
 
-	// Get the worktime by column (-1 because of the date column)
-	if (av.selectedItem.Col - 1) < len(wtList) {
-		return wtList[av.selectedItem.Col-1], nil
+	// Get the worktime by column (-2 because of the date column)
+	if av.selectedItem.Col > (extraColumns-1) && av.selectedItem != nil && av.selectedItem.Col-extraColumns < len(wtList) {
+		return wtList[av.selectedItem.Col-extraColumns], nil
 	} else {
 		return nil, errors.New("no worktime found")
-	}
-}
-
-/*
-Deletes a time entry from the database
-*/
-func (av *AppView) deleteTimeEntry(wt *db.Worktime) {
-	// Deletion here
-	rows, err := av.repo.DeleteWorktime(wt)
-	if rows != 0 || err != nil {
-		// Refresh *all data*
-		av.refreshAll()
-	}
-}
-
-/*
-Combines the refresh of the data and the timetable
-*/
-func (av *AppView) refreshAll() {
-	av.RefreshData()
-	av.timetable.Refresh()
-}
-
-func (av *AppView) UnselectTableItem() {
-	if av.selectedItem != nil {
-		log.Debug("Unselect item", "item", av.selectedItem)
-		av.timetable.Unselect(*av.selectedItem)
-	} else {
-		dialog.ShowError(errors.New("no item selected"), av.window)
 	}
 }
 
@@ -311,10 +308,15 @@ func (av *AppView) editButtonFunc() {
 	// Check if is a day or a time entry selected
 	// Assure that there is an item selected
 	if av.selectedItem == nil || av.selectedItem.Col == 0 {
-		dialog.ShowError(errors.New("no time selected"), av.window)
+		dialog.ShowError(errors.New("no worktime selected"), av.window)
 		return
 	}
 	wt, err := av.getTimeEntry(av.selectedItem)
+	if err != nil && wt == nil {
+		dialog.ShowError(err, av.window)
+		return
+	}
+	wd, err := av.repo.GetWorkday(wt.Time)
 
 	if wt != nil && err == nil {
 		timeEntry := widget.NewEntry()
@@ -341,7 +343,7 @@ func (av *AppView) editButtonFunc() {
 				}
 
 				// Add the current date to the updated time entry
-				tempTime := time.Now().In(loc).Format(time.DateOnly) + " " + timeEntry
+				tempTime := wd.Date.In(loc).Format(time.DateOnly) + " " + timeEntry
 				nt, err := time.ParseInLocation(time.DateTime, tempTime, loc)
 				if err != nil {
 					dialog.ShowError(err, av.window)
@@ -349,8 +351,8 @@ func (av *AppView) editButtonFunc() {
 				}
 				log.Info("New time", "time", nt)
 
-				prevCol := widget.TableCellID{Row: av.selectedItem.Row, Col: av.selectedItem.Col - 1} // -1 because of the date column
-				if prevCol.Col >= 1 {                                                                 // If there is a previous entry
+				prevCol := widget.TableCellID{Row: av.selectedItem.Row, Col: av.selectedItem.Col - extraColumns}
+				if prevCol.Col >= 1 { // If there is a previous entry
 					prevTime, err := av.getTimeEntry(&prevCol)
 					log.Debug("Previous time", "time", prevTime.Time)
 					if err != nil {
@@ -392,4 +394,104 @@ func (av *AppView) editButtonFunc() {
 	} else {
 		dialog.ShowError(errors.New("no item selected"), av.window)
 	}
+}
+
+/*
+Calculates the breaktime for a workday
+*/
+func (av *AppView) calculateBreak() {
+	// TODO the question is, when is the breaktime calculated?
+	//  - After the end of the workday? when is it?
+
+	// Run this all time in the background
+
+	for {
+		// TODO Make duration configurable
+		tts := 15 * time.Second
+		log.Info("Calculate breaktime", "time-to-sleep", tts)
+		time.Sleep(tts)
+
+		log.Debug("Calculate breaktime")
+		wd, errWd := av.repo.GetAllWorkday()
+		if errWd != nil {
+			log.Error(errWd)
+		}
+
+		for _, w := range wd {
+			log.Debug("Workday", "workday", w)
+			wts, errWt := av.repo.GetAllWorktime(w)
+			if errWt != nil {
+				log.Error(errWt)
+			}
+
+			/*
+				breaktime := 0min when time <= 6:00
+				breaktime := 30min when time > 6:00
+				breaktime := 45min when time > 9:00
+			*/
+			var breaktime time.Duration = 0 * time.Minute
+			var worktime time.Duration = 0 * time.Minute
+
+			wtsLength := len(wts)
+			for c, wt := range wts {
+				if c+1 < wtsLength {
+					if wt.Type == "Begin" {
+						end := wts[c+1]
+						// Entfernen der Nanosekunden von der Zeit
+						startTime := wt.Time.Truncate(time.Second)
+						endTime := end.Time.Truncate(time.Second)
+						worktime += endTime.Sub(startTime)
+					}
+				}
+			}
+
+			log.Debug("All day worktime", "worktime", worktime)
+
+			switch {
+			case worktime < 6*time.Hour:
+				breaktime = 0 * time.Minute
+			case worktime >= 6*time.Hour && worktime < 9*time.Hour:
+				breaktime = 30 * time.Minute
+			case worktime >= 9*time.Hour:
+				breaktime = 45 * time.Minute
+			default: // This should never happen
+				breaktime = 30 * time.Minute
+			}
+
+			// FIXME currently it's saved as string in the database as workaround
+			// Update the workday with the calculated breaktime
+			w.Breaktime = breaktime.Truncate(time.Minute).String()
+			w.Time = (worktime - breaktime).String()
+			log.Debug("Update workday",
+				"worktime", worktime, "breaktime", breaktime)
+
+			_, errUpdate := av.repo.UpdateWorkday(w)
+			if errUpdate != nil {
+				log.Error(errUpdate)
+			}
+		}
+
+		// Refresh *all data*
+		av.refreshAll()
+	}
+}
+
+/*
+Deletes a time entry from the database
+*/
+func (av *AppView) deleteTimeEntry(wt *db.Worktime) {
+	// Deletion here
+	rows, err := av.repo.DeleteWorktime(wt)
+	if rows != 0 || err != nil {
+		// Refresh *all data*
+		av.refreshAll()
+	}
+}
+
+/*
+Combines the refresh of the data and the timetable
+*/
+func (av *AppView) refreshAll() {
+	av.RefreshData()
+	av.timetable.Refresh()
 }

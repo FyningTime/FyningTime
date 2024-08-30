@@ -1,15 +1,16 @@
-module main
+module github.com/FyningTime/FyningTime
 
 go 1.22
 
 require (
-	fyne.io/fyne/v2 v2.5.0
+	fyne.io/fyne/v2 v2.5.1
 	github.com/charmbracelet/log v0.4.0
 	github.com/mattn/go-sqlite3 v1.14.22
 )
 
 require (
 	fyne.io/systray v1.11.0 // indirect
+	fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/lipgloss v0.10.0 // indirect
@@ -22,7 +23,7 @@ require (
 	github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240506104042-037f3cc74f2a // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/go-text/render v0.1.0 // indirect
+	github.com/go-text/render v0.1.1-0.20240418202334-dd62631dae9b // indirect
 	github.com/go-text/typesetting v0.1.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
@@ -36,7 +37,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rymdport/portal v0.2.2 // indirect
+	github.com/rymdport/portal v0.2.6 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.9.0 // indirect

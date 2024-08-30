@@ -3,8 +3,9 @@ package repo
 import (
 	"database/sql"
 	"errors"
-	"main/app/model/db"
 	"time"
+
+	"github.com/FyningTime/FyningTime/app/model/db"
 
 	"github.com/charmbracelet/log"
 )
@@ -32,12 +33,14 @@ func (r *SQLiteRepository) Migrate() error {
     CREATE TABLE IF NOT EXISTS workday(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date DATETIME NOT NULL UNIQUE,
-		breaktime DATETIME DEFAULT '00:30:00'
+		time TEXT default '00:00:00',
+		breaktime INTEGER DEFAULT 0
     );
 
 	CREATE TABLE IF NOT EXISTS worktime(
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		type TEXT NOT NULL,
+		time DATETIME,
 		workday INTEGER,
 		FOREIGN KEY(workday) REFERENCES workday(id)
 	);
@@ -86,21 +89,29 @@ func (r *SQLiteRepository) AddWorktime(worktime *db.Worktime) (*db.Worktime, err
 
 func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	log.Info("Getting workday", "date", date)
-	query := `SELECT id, date from workday WHERE date = ? ORDER BY date DESC LIMIT 1`
-	var workday db.Workday
+	query := `SELECT id, date, time, breaktime 
+	from workday WHERE date = ? ORDER BY date DESC LIMIT 1`
 
-	err := r.db.QueryRow(query, date.Format(time.DateOnly)).Scan(&workday.ID, &workday.Date)
+	var w db.Workday
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	tmpDate := w.Date.In(loc)
+	qd := date.In(loc).Format(time.DateOnly)
+	log.Debug("Query date", "date", qd)
+	err := r.db.QueryRow(query, qd).
+		Scan(&w.ID, &tmpDate, &w.Time, &w.Breaktime)
+	w.Date = tmpDate
+
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 
-	return &workday, nil
+	return &w, nil
 }
 
 func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
 	log.Info("Getting all workdays")
-	query := `SELECT id, date FROM workday ORDER BY date DESC`
+	query := `SELECT id, date, time, breaktime FROM workday ORDER BY date DESC`
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -108,20 +119,20 @@ func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
 	}
 	defer rows.Close()
 
-	var workday []*db.Workday
+	var workdays []*db.Workday
 	for rows.Next() {
 		var w db.Workday
-		err := rows.Scan(&w.ID, &w.Date)
+		err := rows.Scan(&w.ID, &w.Date, &w.Time, &w.Breaktime)
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
 
 		log.Debug("Workday", "id", w.ID, "date", w.Date)
-		workday = append(workday, &w)
+		workdays = append(workdays, &w)
 	}
 
-	return workday, nil
+	return workdays, nil
 }
 
 func (r *SQLiteRepository) GetAllWorktime(workday *db.Workday) ([]*db.Worktime, error) {
@@ -180,11 +191,28 @@ func (r *SQLiteRepository) DeleteWorkday(workday *db.Workday) (int64, error) {
 
 func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) {
 	log.Info("Updating worktime", "worktime-id", worktime.ID)
-	query := `UPDATE worktime SET type = ?, time = ?, breaktime = ? WHERE id = ?`
+	query := `UPDATE worktime SET type = ?, time = ? WHERE id = ?`
 
 	loc, _ := time.LoadLocation("Europe/Berlin")
 	tmpTime := worktime.Time.In(loc)
-	res, err := r.db.Exec(query, worktime.Type, tmpTime, worktime.Breaktime, worktime.ID)
+	res, err := r.db.Exec(query, worktime.Type, tmpTime, worktime.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) UpdateWorkday(workday *db.Workday) (int64, error) {
+	log.Info("Updating workday", "workday", workday)
+	query := `UPDATE workday 
+		SET breaktime = ?, time = ?
+		WHERE id = ?`
+
+	res, err := r.db.Exec(query,
+		workday.Breaktime,
+		workday.Time,
+		workday.ID)
 	if err != nil {
 		log.Error(err)
 		return 0, err

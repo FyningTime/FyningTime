@@ -3,7 +3,8 @@ package main
 import (
 	"database/sql"
 	"flag"
-	"main/app/view"
+
+	"github.com/FyningTime/FyningTime/app/view"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -16,6 +17,7 @@ import (
 func main() {
 	var devFlag bool
 	initLogging(devFlag)
+	db := GetDB("fyningtime.db")
 
 	progName := "FyningTime"
 	log.Info("Welcome to " + progName)
@@ -24,7 +26,7 @@ func main() {
 	w := a.NewWindow(progName)
 
 	av := new(view.AppView)
-	av.CreateRepository(GetDB("fyningtime.db"))
+	av.CreateRepository(db)
 	// INFO Date is the basic header, for each entry a new header is added
 	av.AddHeaders([]string{"Date"})
 	av.RefreshData()
@@ -47,6 +49,22 @@ func main() {
 		desk.SetSystemTrayMenu(m)
 	}
 
+	w.SetMainMenu(
+		fyne.NewMainMenu(
+			fyne.NewMenu("File", fyne.NewMenuItem("About", func() {
+				log.Info("Tapped about")
+				dialog.ShowInformation("About",
+					"FyneTime is a simple time tracking application", w)
+			}),
+			),
+		),
+	)
+
+	w.SetOnClosed(func() {
+		log.Info("Closing database")
+		db.Close()
+		a.Quit()
+	})
 	w.SetContent(mv)
 	w.Resize(fyne.NewSize(1000, 600))
 	w.ShowAndRun()
