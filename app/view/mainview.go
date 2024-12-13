@@ -129,7 +129,7 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 		container.NewTabItem("Timer", timerContainer),
 		container.NewTabItem("Calendar View", widget.NewLabel("Comes in future! 😁")),
 		container.NewTabItem("Vacations Planner", widget.NewLabel("Comes in future! 😁")),
-		container.NewTabItem("Details", widget.NewLabel("Details")),
+		container.NewTabItem("Details", widget.NewLabel("Comes in future! 😁")),
 	)
 
 	appContainer := container.NewBorder(nil, nil, nil, nil, appTabs)
