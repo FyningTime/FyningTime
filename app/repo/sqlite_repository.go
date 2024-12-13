@@ -110,7 +110,7 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 }
 
 func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
-	log.Info("Getting all workdays")
+	log.Debug("Getting all workdays")
 	query := `SELECT id, date, time, breaktime FROM workday ORDER BY date DESC`
 
 	rows, err := r.db.Query(query)

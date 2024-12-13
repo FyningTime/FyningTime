@@ -351,7 +351,7 @@ func (av *AppView) editButtonFunc() {
 				}
 				log.Info("New time", "time", nt)
 
-				prevCol := widget.TableCellID{Row: av.selectedItem.Row, Col: av.selectedItem.Col - extraColumns}
+				prevCol := widget.TableCellID{Row: av.selectedItem.Row, Col: av.selectedItem.Col - 1}
 				if prevCol.Col >= 1 { // If there is a previous entry
 					prevTime, err := av.getTimeEntry(&prevCol)
 					log.Debug("Previous time", "time", prevTime.Time)
@@ -407,7 +407,7 @@ func (av *AppView) calculateBreak() {
 
 	for {
 		// TODO Make duration configurable
-		tts := 15 * time.Second
+		tts := 60 * 5 * time.Second
 		log.Info("Calculate breaktime", "time-to-sleep", tts)
 		time.Sleep(tts)
 
