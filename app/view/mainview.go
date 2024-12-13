@@ -122,10 +122,20 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	timeToolbar := widget.NewToolbar(btnAddTimeToolbarItem,
 		btnDeleteTimeToolbarItem, btnEditTimeToolbarItem)
 
-	cnt := container.NewBorder(timeToolbar, nil, nil, nil, tt)
+	timerContainer := container.NewBorder(timeToolbar, nil, nil, nil, tt)
+
+	// Add appbar
+	appTabs := container.NewAppTabs(
+		container.NewTabItem("Timer", timerContainer),
+		container.NewTabItem("Calendar View", widget.NewLabel("Comes in future! 😁")),
+		container.NewTabItem("Vacations Planner", widget.NewLabel("Comes in future! 😁")),
+		container.NewTabItem("Details", widget.NewLabel("Details")),
+	)
+
+	appContainer := container.NewBorder(nil, nil, nil, nil, appTabs)
 
 	go av.calculateBreak()
-	return cnt
+	return appContainer
 }
 
 func (av *AppView) AddTimeEntry() {
