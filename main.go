@@ -18,17 +18,19 @@ import (
 func main() {
 	var devFlag bool
 	initLogging(devFlag)
-	db := GetDB("fyningtime.db")
 
-	progName := "FyningTime"
-	log.Info("Welcome to " + progName)
-
-	// Test settings
+	// Read settings
 	settings, err := service.ReadSettings()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Info("Settings: " + settings.SavedPath)
+	log.Debugf("Settings file: %+v\n", settings)
+
+	// Open database
+	db := GetDB(settings.SavedDbPath)
+
+	progName := "FyningTime"
+	log.Info("Welcome to " + progName)
 
 	a := app.NewWithID("com.github.fyningtime.fyningtime")
 	w := a.NewWindow(progName)
@@ -61,12 +63,11 @@ func main() {
 		fyne.NewMainMenu(
 			fyne.NewMenu("File",
 				fyne.NewMenuItem("About", func() {
-					log.Info("Tapped about")
 					dialog.ShowInformation("About",
 						"FyneTime is a simple time tracking application", w)
 				}),
 				fyne.NewMenuItem("Settings", func() {
-					log.Info("Tapped settings")
+					view.GetSettingsView(w).Show()
 				})),
 		),
 	)

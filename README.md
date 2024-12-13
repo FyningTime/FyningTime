@@ -9,7 +9,7 @@ Features which are planned:
 * Customize your time table as you wish
 * ✅ Everything is local (sqlite) no data will be exposed or tracked (sadly it's a feature)
 * By wish, the app starts/ends automatically by startup/shutdown and tracks beginning of your work day. (Next day you can review it anyway 😬)
-* Customize the app (e.g. primary/secondary colors) (with v2)
+* Customize the app
 * Create a notification warning if you work too long! (It would be sad if you work too long. 😉)
 * Vacation planning
 * Calendar view
