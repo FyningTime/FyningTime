@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 
+	"github.com/FyningTime/FyningTime/app/service"
 	"github.com/FyningTime/FyningTime/app/view"
 
 	"fyne.io/fyne/v2"
@@ -17,7 +18,16 @@ import (
 func main() {
 	var devFlag bool
 	initLogging(devFlag)
-	db := GetDB("fyningtime.db")
+
+	// Read settings
+	settings, err := service.ReadSettings()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Debugf("Settings file: %+v\n", settings)
+
+	// Open database
+	db := GetDB(settings.SavedDbPath)
 
 	progName := "FyningTime"
 	log.Info("Welcome to " + progName)
@@ -51,12 +61,14 @@ func main() {
 
 	w.SetMainMenu(
 		fyne.NewMainMenu(
-			fyne.NewMenu("File", fyne.NewMenuItem("About", func() {
-				log.Info("Tapped about")
-				dialog.ShowInformation("About",
-					"FyneTime is a simple time tracking application", w)
-			}),
-			),
+			fyne.NewMenu("File",
+				fyne.NewMenuItem("About", func() {
+					dialog.ShowInformation("About",
+						"FyneTime is a simple time tracking application", w)
+				}),
+				fyne.NewMenuItem("Settings", func() {
+					view.GetSettingsView(w).Show()
+				})),
 		),
 	)
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/FyningTime/FyningTime/app/model/db"
 	"github.com/FyningTime/FyningTime/app/repo"
+	"github.com/FyningTime/FyningTime/app/service"
 
 	"github.com/charmbracelet/log"
 
@@ -42,7 +43,7 @@ type AppView struct {
 	repo *repo.SQLiteRepository
 }
 
-func (av *AppView) CreateUI(w fyne.Window) *container.Split {
+func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	// Assign the window to the main app struct
 	av.window = w
 
@@ -121,13 +122,20 @@ func (av *AppView) CreateUI(w fyne.Window) *container.Split {
 	timeToolbar := widget.NewToolbar(btnAddTimeToolbarItem,
 		btnDeleteTimeToolbarItem, btnEditTimeToolbarItem)
 
-	cnt := container.NewVSplit(timeToolbar, tt)
-	cnt.Resize(fyne.NewSize(1000, 600))
+	timerContainer := container.NewBorder(timeToolbar, nil, nil, nil, tt)
 
-	//cnt := NewResponsiveLayout(timeToolbar, tt)
+	// Add appbar
+	appTabs := container.NewAppTabs(
+		container.NewTabItem("Timer", timerContainer),
+		container.NewTabItem("Calendar View", widget.NewLabel("Comes in future! 😁")),
+		container.NewTabItem("Vacations Planner", widget.NewLabel("Comes in future! 😁")),
+		container.NewTabItem("Details", widget.NewLabel("Comes in future! 😁")),
+	)
+
+	appContainer := container.NewBorder(nil, nil, nil, nil, appTabs)
 
 	go av.calculateBreak()
-	return cnt
+	return appContainer
 }
 
 func (av *AppView) AddTimeEntry() {
@@ -351,20 +359,16 @@ func (av *AppView) editButtonFunc() {
 				}
 				log.Info("New time", "time", nt)
 
-				prevCol := widget.TableCellID{Row: av.selectedItem.Row, Col: av.selectedItem.Col - extraColumns}
+				prevCol := widget.TableCellID{
+					Row: av.selectedItem.Row,
+					Col: av.selectedItem.Col - 1,
+				}
 				if prevCol.Col >= 1 { // If there is a previous entry
 					prevTime, err := av.getTimeEntry(&prevCol)
 					log.Debug("Previous time", "time", prevTime.Time)
 					if err != nil {
 						dialog.ShowError(err, av.window)
 						return
-					} else {
-						// The edit shouldn't be before the previous entry
-						log.Debug("Compare new-time with prev-time", "new-time", nt, "prev-time", prevTime.Time)
-						if nt.Before(prevTime.Time) {
-							dialog.ShowError(errors.New("time is before previous entry"), av.window)
-							return
-						}
 					}
 				}
 
@@ -400,14 +404,14 @@ func (av *AppView) editButtonFunc() {
 Calculates the breaktime for a workday
 */
 func (av *AppView) calculateBreak() {
-	// TODO the question is, when is the breaktime calculated?
-	//  - After the end of the workday? when is it?
-
 	// Run this all time in the background
-
 	for {
-		// TODO Make duration configurable
-		tts := 15 * time.Second
+		settings, err := service.ReadSettings()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		tts := time.Duration(settings.RefreshTimeUi) * time.Second
 		log.Info("Calculate breaktime", "time-to-sleep", tts)
 		time.Sleep(tts)
 
