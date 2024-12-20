@@ -54,6 +54,7 @@ func ReadSettings() (*model.Settings, error) {
 		log.Fatal(err)
 		return nil, err
 	}
+	defer file.Close()
 
 	return validateSettings(&settings)
 }
@@ -75,9 +76,9 @@ func WriteSettings(s *model.Settings) error {
 		}
 		file = newFile
 	}
-	defer file.Close()
+	//defer file.Close()
 
-	byteValue, err := json.MarshalIndent(s, "", " ")
+	byteValue, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		log.Fatal(err)
 		return err
@@ -87,6 +88,7 @@ func WriteSettings(s *model.Settings) error {
 		log.Fatal(err)
 		return err
 	}
+	defer file.Close()
 	return nil
 }
 
@@ -123,18 +125,9 @@ func GetFyningTimePath(file ...string) (string, error) {
  */
 func validateSettings(s *model.Settings) (*model.Settings, error) {
 	var err error
-	if s.FirstDayOfWeek < model.Monday || s.FirstDayOfWeek > model.Sunday {
-		log.Warn("First day of week is not set correctly. Set to Monday.")
-		s.FirstDayOfWeek = model.Monday
-	}
-	if s.MaxVacationDays < 0 { // 0 is the minimum
-		log.Warn("Max vacation days is not set correctly. Set to 30 days.")
-		s.MaxVacationDays = 30
-	}
-	if s.RefreshTimeUi < 15 { // 15 seconds is the minimum
-		log.Warn("Refresh time is not set correctly. Set to 15 seconds.")
-		s.RefreshTimeUi = 15
-	}
+
+	// Paths should be automatically set by application
+	// it's just for information where the files are stored
 	if s.SavedDbPath == "" {
 		log.Error("DB path is not set correctly")
 		err = errors.New("DB path is not set correctly")
@@ -142,6 +135,31 @@ func validateSettings(s *model.Settings) (*model.Settings, error) {
 	if s.SavedPath == "" {
 		log.Error("Saved path is not set correctly")
 		err = errors.New("saved path is not set correctly")
+	}
+
+	// UI specific configuration
+	// Refresh rate to determin work breaks should be at least 15 seconds
+	if s.RefreshTimeUi < 15 { // 15 seconds is the minimum
+		log.Warn("Refresh time is not set correctly. Set to 15 seconds.")
+		s.RefreshTimeUi = 15
+	}
+
+	// Business logic specific configuration
+
+	if s.WeekHours < 0 { // 0 is the minimum
+		log.Warn("Week hours is not set correctly. Set to 40 hours.")
+		s.WeekHours = 40
+	}
+
+	// In Europe the first work day of the week is Monday
+	if s.FirstDayOfWeek < model.Monday || s.FirstDayOfWeek > model.Sunday {
+		log.Warn("First day of week is not set correctly. Set to Monday.")
+		s.FirstDayOfWeek = model.Monday
+	}
+	// Everyone should have vacations
+	if s.MaxVacationDays < 0 { // 0 is the minimum
+		log.Warn("Max vacation days is not set correctly. Set to 30 days.")
+		s.MaxVacationDays = 30
 	}
 
 	return s, err

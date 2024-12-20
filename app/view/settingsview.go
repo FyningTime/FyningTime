@@ -17,8 +17,10 @@ func GetSettingsView(w fyne.Window) *dialog.FormDialog {
 		return nil
 	}
 
-	firstDayOfWeekEntry := widget.NewEntry()
-	firstDayOfWeekEntry.SetText(strconv.Itoa(int(settings.FirstDayOfWeek)))
+	firstDayOfWeekEntry := widget.NewSelectEntry(
+		[]string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"})
+	weekday := settings.FirstDayOfWeek
+	firstDayOfWeekEntry.SetText(model.WeekdayToString(weekday))
 
 	maxVacations := widget.NewEntry()
 	maxVacations.SetText(strconv.Itoa(settings.MaxVacationDays))
@@ -36,12 +38,7 @@ func GetSettingsView(w fyne.Window) *dialog.FormDialog {
 	dia := dialog.NewForm("Settings", "Save", "Cancel", form, func(ok bool) {
 		if ok {
 			// Save settings
-			weekday, err := strconv.Atoi(firstDayOfWeekEntry.Text)
-			if err != nil {
-				dialog.ShowError(err, w)
-				return
-			}
-			settings.FirstDayOfWeek = model.IntToWeekday(weekday)
+			settings.FirstDayOfWeek = model.StringToWeekday(firstDayOfWeekEntry.Text)
 
 			intMaxVacations, err := strconv.Atoi(maxVacations.Text)
 			if err != nil {

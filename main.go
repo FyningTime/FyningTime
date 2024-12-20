@@ -78,7 +78,7 @@ func main() {
 		a.Quit()
 	})
 	w.SetContent(mv)
-	w.Resize(fyne.NewSize(1000, 600))
+	w.Resize(fyne.NewSize(600, 600))
 	w.ShowAndRun()
 }
 

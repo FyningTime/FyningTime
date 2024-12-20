@@ -33,7 +33,7 @@ func (r *SQLiteRepository) Migrate() error {
     CREATE TABLE IF NOT EXISTS workday(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date DATETIME NOT NULL UNIQUE,
-		time TEXT default '00:00:00',
+		time TEXT default '01.01.1970',
 		breaktime INTEGER DEFAULT 0
     );
 
@@ -43,6 +43,12 @@ func (r *SQLiteRepository) Migrate() error {
 		time DATETIME,
 		workday INTEGER,
 		FOREIGN KEY(workday) REFERENCES workday(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS vacations(
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		startdate DATETIME NOT NULL UNIQUE,
+		enddate DATETIME NOT NULL UNIQUE
 	);
     `
 
@@ -218,4 +224,64 @@ func (r *SQLiteRepository) UpdateWorkday(workday *db.Workday) (int64, error) {
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) AddVacation(vacation *db.Vacation) (*db.Vacation, error) {
+	log.Info("Adding vacation", "start", vacation.StartDate, "end", vacation.EndDate)
+	query := `INSERT INTO vacations(startdate, enddate) VALUES(?, ?)`
+
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	vacation.StartDate = vacation.StartDate.In(loc)
+	vacation.EndDate = vacation.EndDate.In(loc)
+
+	res, err := r.db.Exec(query,
+		vacation.StartDate,
+		vacation.EndDate,
+	)
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	vacation.ID = id
+	return vacation, nil
+}
+
+func (r *SQLiteRepository) GetAllVacation() ([]*db.Vacation, error) {
+	log.Info("Getting all vacations")
+	query := `SELECT ID, startdate, enddate FROM vacations ORDER BY startdate DESC`
+
+	var v []*db.Vacation
+	rows, err := r.db.Query(query)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var vacation db.Vacation
+		loc, _ := time.LoadLocation("Europe/Berlin")
+
+		sd := vacation.StartDate.In(loc)
+		ed := vacation.EndDate.In(loc)
+
+		err := rows.Scan(&vacation.ID, &sd, &ed)
+
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+		vacation.StartDate = sd
+		vacation.EndDate = ed
+		v = append(v, &vacation)
+	}
+	log.Debug("Vacations", "size", len(v))
+
+	return v, nil
 }
