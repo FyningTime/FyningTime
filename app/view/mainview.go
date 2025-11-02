@@ -507,8 +507,24 @@ func (av *AppView) calculateBreak(skipWait ...bool) {
 		*/
 		var breaktime time.Duration = 0 * time.Minute
 		var worktime time.Duration = 0 * time.Minute
+		var workTimeDiff time.Duration = 0 * time.Minute
 
 		wtsLength := len(wts)
+		tempWtsLength := wtsLength
+		tempWts := wts
+
+		if tempWtsLength%2 == 0 && tempWtsLength >= 4 {
+			for tempWtsLength > 2 && tempWtsLength%2 == 0 {
+				// Calculate the difference between begin and the previous end time
+				lastBegin := tempWts[tempWtsLength-2]
+				lastEnd := tempWts[tempWtsLength-3]
+				workTimeDiff = workTimeDiff + lastBegin.Time.Sub(lastEnd.Time)
+				log.Debug("Worktime difference for even entries", "worktime-diff", workTimeDiff)
+				tempWtsLength -= 2
+				tempWts = tempWts[:tempWtsLength]
+			}
+		}
+
 		for c, wt := range wts {
 			if c+1 < wtsLength {
 				if wt.Type == "Begin" {
@@ -523,15 +539,19 @@ func (av *AppView) calculateBreak(skipWait ...bool) {
 
 		log.Debug("All day worktime", "worktime", worktime)
 
-		switch {
-		case worktime < 6*time.Hour:
-			breaktime = 0 * time.Minute
-		case worktime >= 6*time.Hour && worktime < 9*time.Hour:
-			breaktime = 30 * time.Minute
-		case worktime >= 9*time.Hour:
-			breaktime = 45 * time.Minute
-		default: // This should never happen
-			breaktime = 30 * time.Minute
+		if workTimeDiff == 0 {
+			switch {
+			case worktime < 6*time.Hour:
+				breaktime = 0 * time.Minute
+			case worktime >= 6*time.Hour && worktime < 9*time.Hour:
+				breaktime = 30 * time.Minute
+			case worktime >= 9*time.Hour:
+				breaktime = 45 * time.Minute
+			default: // This should never happen
+				breaktime = 30 * time.Minute
+			}
+		} else {
+			breaktime = workTimeDiff
 		}
 
 		// FIXME currently it's saved as string in the database as workaround
@@ -540,7 +560,11 @@ func (av *AppView) calculateBreak(skipWait ...bool) {
 		if strings.Contains(w.Breaktime, "m0s") {
 			w.Breaktime = w.Breaktime[:len(w.Breaktime)-2]
 		}
-		w.Time = (worktime - breaktime).String()
+		if workTimeDiff == 0 {
+			w.Time = (worktime - breaktime).String()
+		} else {
+			w.Time = worktime.String()
+		}
 		log.Debug("Update workday",
 			"worktime", worktime, "breaktime", breaktime)
 
@@ -576,6 +600,8 @@ func (av *AppView) refreshAll() {
 	} else {
 		av.vacations = v
 	}
-	av.RefreshData()
-	av.timetable.Refresh()
+	fyne.Do(func() {
+		av.RefreshData()
+		av.timetable.Refresh()
+	})
 }
