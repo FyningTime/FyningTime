@@ -97,7 +97,7 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 					} else if (i.Col%2 == 0 || len(wtday)%2 == 0) && currentWt.Type == "End" {
 						label.TextStyle = fyne.TextStyle{Bold: false}
 					}
-					label.SetText(currentWt.Time.Format(time.TimeOnly)
+					label.SetText(currentWt.Time.Format(time.TimeOnly))
 				} else {
 					label.SetText("")
 				}
