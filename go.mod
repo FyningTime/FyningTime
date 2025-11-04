@@ -1,6 +1,7 @@
 module github.com/FyningTime/FyningTime
 
 go 1.22
+toolchain go1.23.7
 
 require (
 	fyne.io/fyne/v2 v2.7.0
