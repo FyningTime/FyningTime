@@ -3,6 +3,7 @@ package view
 import (
 	"database/sql"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,10 +21,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-const (
-	extraColumns = 2 // Date and Time/Breaktime
-)
-
 type AppView struct {
 	// Holds the main window
 	window fyne.Window
@@ -34,7 +31,8 @@ type AppView struct {
 	// TODO add toolbar widget
 
 	// Represents the headers for the timetable
-	headers []string
+	baseHeaders []string
+	headers     []string
 
 	// Actual db abstraction
 	worktime  []*db.Worktime
@@ -55,24 +53,12 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	// Assign the window to the main app struct
 	av.window = w
 
+	extraColumns := len(av.baseHeaders)
+
 	tt := widget.NewTable(
 		func() (int, int) {
 			// find longest day to calculate column count
-			var longestDay int
-			var tempDay int
-
-			for _, wd := range av.workday {
-				tempDay = 0
-				for _, w := range av.worktime {
-					if w.Workday.ID == wd.ID {
-						tempDay++
-					}
-				}
-
-				if tempDay > longestDay {
-					longestDay = tempDay
-				}
-			}
+			longestDay := av.getLongestWorkday()
 
 			return len(av.workday), longestDay + extraColumns // +1 for the date row
 		},
@@ -95,24 +81,23 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 			label.TextStyle = fyne.TextStyle{Bold: false}
 			label.Importance = widget.MediumImportance
 
-			if i.Col == 0 {
+			switch i.Col {
+			case 0:
 				label.SetText(wd.Date.Format(model.DATEFORMAT) +
 					" / " + model.ShortenWeekday(wd.Date.Weekday().String()))
 				label.TextStyle = fyne.TextStyle{Bold: true}
-			} else if i.Col == 1 {
+			case 1:
 				label.SetText(wd.Time + " / " + wd.Breaktime)
 				label.TextStyle = fyne.TextStyle{Bold: false}
-			} else {
+			default:
 				if i.Col-extraColumns < len(wtday) && i.Col > 1 {
 					currentWt := wtday[i.Col-extraColumns]
 					if (i.Col%2 != 0 || len(wtday)%2 != 0) && currentWt.Type == "Begin" {
-						label.TextStyle = fyne.TextStyle{Bold: true}
-						label.Importance = widget.HighImportance
+						label.TextStyle = fyne.TextStyle{Bold: false}
 					} else if (i.Col%2 == 0 || len(wtday)%2 == 0) && currentWt.Type == "End" {
 						label.TextStyle = fyne.TextStyle{Bold: false}
 					}
-					workType := " (" + currentWt.Type + ") "
-					label.SetText(currentWt.Time.Format(time.TimeOnly) + workType)
+					label.SetText(currentWt.Time.Format(time.TimeOnly)
 				} else {
 					label.SetText("")
 				}
@@ -121,14 +106,29 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	)
 	// Set the headers
 	tt.CreateHeader = func() fyne.CanvasObject {
-		return widget.NewLabel("Date")
+		return widget.NewLabel("")
 	}
-	tt.UpdateHeader = func(i widget.TableCellID, o fyne.CanvasObject) {
+	tt.UpdateHeader = func(id widget.TableCellID, template fyne.CanvasObject) {
+		lbl := template.(*widget.Label)
+
+		// Column headers (top row): Row == -1
+		if id.Row == -1 && id.Col >= 0 {
+			if id.Col < len(av.headers) {
+				lbl.SetText(av.headers[id.Col])
+			} else {
+				lbl.SetText("")
+			}
+			lbl.TextStyle = fyne.TextStyle{Bold: true}
+		}
 	}
+	tt.ShowHeaderRow = true
+	tt.StickyColumnCount = 2
+
 	tt.OnSelected = func(id widget.TableCellID) {
 		av.selectedItem = &id
 	}
-	tt.Resize(fyne.NewSize(1000, 600))
+	tt.Resize(fyne.NewSize(800, 600))
+
 	av.timetable = tt
 
 	btnAddTimeToolbarItem := widget.NewToolbarAction(theme.ContentAddIcon(), av.AddTimeEntry)
@@ -155,6 +155,34 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 
 	go av.caclulateBreakLoop()
 	return appContainer
+}
+
+func (av *AppView) SetBaseHeaders(headers []string) {
+	av.baseHeaders = headers
+}
+
+func (av *AppView) buildHeaders() {
+	// Compute the longest number of worktimes across all days
+	log.Debug("Build headers for timetable")
+
+	longest := av.getLongestWorkday()
+
+	// Base columns
+	headers := []string{}
+	headers = append(headers, av.baseHeaders...)
+
+	// Dynamic time-entry columns
+	for i := range longest {
+		// Option A: Label them as Begin/End pairs
+		if i%2 == 0 {
+			headers = append(headers, "Begin #"+strconv.Itoa(i/2+1))
+		} else {
+			headers = append(headers, "End #"+strconv.Itoa(i/2+1))
+		}
+	}
+
+	log.Debug("Headers built", "headers", headers)
+	av.headers = headers
 }
 
 func (av *AppView) AddTimeEntry() {
@@ -209,12 +237,31 @@ func (av *AppView) AddTimeEntry() {
 	go av.calculateBreak(true)
 }
 
+func (av *AppView) EditSelectedTimeEntry() {
+	av.editButtonFunc()
+}
+
 func (av *AppView) UnselectTableItem() {
 	if av.selectedItem != nil {
 		log.Debug("Unselect item", "item", av.selectedItem)
 		av.timetable.Unselect(*av.selectedItem)
 	} else {
 		dialog.ShowError(errors.New("no item selected"), av.window)
+	}
+}
+
+func (av *AppView) DeleteSelectedTimeEntry() {
+	if av.selectedItem != nil {
+		_, wt, err := av.getTimeEntry(av.selectedItem)
+		if err != nil {
+			dialog.ShowError(err, av.window)
+			return
+		} else if wt == nil {
+			dialog.ShowError(errors.New("no time entry found"), av.window)
+			return
+		}
+		log.Info("Delete selected time entry", "worktime", wt)
+		defer av.deleteTimeEntry(wt)
 	}
 }
 
@@ -244,7 +291,7 @@ func (av *AppView) RefreshData() {
 	}
 
 	av.worktime = nil
-	for i := 0; i < len(wd); i++ {
+	for i := range wd {
 		wt, wtErr := av.repo.GetAllWorktime(wd[i])
 		if wtErr != nil {
 			log.Error(wtErr)
@@ -266,6 +313,9 @@ func (av *AppView) RefreshData() {
 			av.cv.UpdateVacations(v)
 		}
 	}
+
+	// Re-build headers
+	av.refreshTimetable()
 }
 
 // ------------------ Private functions ------------------
@@ -335,6 +385,8 @@ func (av *AppView) getTimeEntry(item *widget.TableCellID) (*db.Workday, *db.Work
 		}
 	}
 
+	extraColumns := len(av.baseHeaders)
+
 	// Get the worktime by column (-2 because of the date column)
 	if av.selectedItem.Col > (extraColumns-1) && av.selectedItem != nil &&
 		av.selectedItem.Col-extraColumns < len(wtList) {
@@ -387,6 +439,7 @@ func (av *AppView) editButtonFunc() {
 
 		typeEntry := widget.NewSelectEntry([]string{"Begin", "End"})
 		typeEntry.SetText(wt.Type)
+		typeEntry.Disable()
 
 		form := []*widget.FormItem{
 			{Text: "Time (hh:mm:ss)", Widget: timeEntry, HintText: "Old entry: " + wt.Time.Format(time.TimeOnly)},
@@ -590,6 +643,11 @@ func (av *AppView) deleteTimeEntry(wt *db.Worktime) {
 	}
 }
 
+func (av *AppView) refreshTimetable() {
+	av.buildHeaders()
+	av.timetable.Refresh()
+}
+
 /*
 Combines the refresh of the data and the timetable
 */
@@ -602,6 +660,25 @@ func (av *AppView) refreshAll() {
 	}
 	fyne.Do(func() {
 		av.RefreshData()
-		av.timetable.Refresh()
 	})
+}
+
+func (av *AppView) getLongestWorkday() int {
+	var longestDay int = 0
+	var tempDay int = 0
+
+	// Find the longest workday
+	for _, wd := range av.workday {
+		tempDay = 0
+		for _, w := range av.worktime {
+			if w.Workday.ID == wd.ID {
+				tempDay++
+			}
+		}
+
+		if tempDay > longestDay {
+			longestDay = tempDay
+		}
+	}
+	return longestDay
 }

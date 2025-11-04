@@ -81,7 +81,6 @@ func CreateVacationPlannerView(av *AppView, repo *repo.SQLiteRepository, vacatio
 
 func (vpv *VacationPlannerView) addVacationForm() {
 	startDate := widget.NewEntry()
-	endDate := widget.NewEntry()
 	startDate.SetPlaceHolder("01.01.1970")
 	startDate.ActionItem = widget.NewButtonWithIcon("", theme.MoreHorizontalIcon(), func() {
 		when := time.Now()
@@ -102,6 +101,7 @@ func (vpv *VacationPlannerView) addVacationForm() {
 		)
 	})
 
+	endDate := widget.NewEntry()
 	endDate.SetPlaceHolder("01.01.1970")
 	endDate.ActionItem = widget.NewButtonWithIcon("", theme.MoreHorizontalIcon(), func() {
 		when := time.Now()
@@ -149,9 +149,11 @@ func (vpv *VacationPlannerView) addVacationForm() {
 }
 
 func (vpv *VacationPlannerView) deleteVacationForm() {
+	// TODO: Implement delete vacation form
 }
 
 func (vpv *VacationPlannerView) editVacationForm() {
+	// TODO: Implement edit vacation form
 }
 
 func (vpv *VacationPlannerView) UpdateVacations(vacations []*db.Vacation) {
