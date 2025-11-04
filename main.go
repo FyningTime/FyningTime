@@ -37,22 +37,31 @@ func main() {
 
 	av := new(view.AppView)
 	av.CreateRepository(db)
-	// INFO Date is the basic header, for each entry a new header is added
-	av.AddHeaders([]string{"Date"})
-	av.RefreshData()
+	av.SetBaseHeaders([]string{"Date", "Time / Break"})
+
 	mv := av.CreateUI(w)
+	av.RefreshData()
 
-	setShortcuts(w, av.UnselectTableItem)
+	// Set shortcuts
+	setShortcuts(w, CreateAppShortcuts(av))
 
-	// TODO implement me usefully!
 	if desk, ok := a.(desktop.App); ok {
 		m := fyne.NewMenu("FyneTime",
-			fyne.NewMenuItem("Without function yet", func() {
-				log.Info("Tapped show")
+			fyne.NewMenuItem("Add current time", func() {
+				av.AddTimeEntry()
 			}),
+			// TODO Show overtime in dialog
+			// fyne.NewMenuItem("Show overtime", func() {
+			// 	overtime, err := av.GetOvertime()
+			// 	if err != nil {
+			// 		dialog.ShowError(err, w)
+			// 		return
+			// 	}
+			// 	dialog.ShowInformation("Overtime", fmt.Sprintf("Current overtime: %s", overtime.String()), w)
+			// }),
 			fyne.NewMenuItem("About", func() {
-				dialog.ShowInformation("About",
-					"FyneTime is a simple time tracking application", w)
+				dialog.NewInformation("About",
+					"FyningTime is a simple time tracking application", w)
 			}),
 		)
 
@@ -64,7 +73,7 @@ func main() {
 			fyne.NewMenu("File",
 				fyne.NewMenuItem("About", func() {
 					dialog.ShowInformation("About",
-						"FyneTime is a simple time tracking application", w)
+						"FyningTime is a simple time tracking application", w)
 				}),
 				fyne.NewMenuItem("Settings", func() {
 					view.GetSettingsView(w).Show()
@@ -78,7 +87,7 @@ func main() {
 		a.Quit()
 	})
 	w.SetContent(mv)
-	w.Resize(fyne.NewSize(1000, 600))
+	w.Resize(fyne.NewSize(800, 600))
 	w.ShowAndRun()
 }
 
@@ -110,13 +119,66 @@ func initLogging(devFlag bool) {
 	}
 }
 
-func setShortcuts(w fyne.Window, callbackShiftDelete func()) {
-	// Shortcut for shift+del
+func setShortcuts(w fyne.Window, shortcuts []AppShortcuts) {
 	log.Info("Setting up shortcuts")
-	deleteShortcut := &desktop.CustomShortcut{KeyName: fyne.KeyDelete,
-		Modifier: fyne.KeyModifierShift}
-	w.Canvas().AddShortcut(deleteShortcut, func(shortcut fyne.Shortcut) {
-		log.Info("Tapped shift+del")
-		callbackShiftDelete()
-	})
+
+	canvas := w.Canvas()
+
+	for _, sc := range shortcuts {
+		customShortcut := &desktop.CustomShortcut{
+			KeyName:  sc.keyname,
+			Modifier: sc.modifier,
+		}
+
+		canvas.AddShortcut(customShortcut, func(shortcut fyne.Shortcut) {
+			log.Infof("Tapped shortcut: %s", sc.name)
+			sc.callback()
+		})
+	}
+}
+
+type AppShortcuts struct {
+	// The shortcut name
+	name     string
+	callback func()
+
+	keyname  fyne.KeyName
+	modifier fyne.KeyModifier
+}
+
+func CreateAppShortcuts(av *view.AppView) []AppShortcuts {
+	unselectShortcut := AppShortcuts{
+		name:     "Unselect Table Item",
+		callback: func() { av.UnselectTableItem() },
+		keyname:  fyne.KeyU,
+		modifier: fyne.KeyModifierControl,
+	}
+
+	deleteSelectedTimeEntryShortcut := AppShortcuts{
+		name:     "Delete Selected Time Entry",
+		callback: func() { av.DeleteSelectedTimeEntry() },
+		keyname:  fyne.KeyDelete,
+		modifier: fyne.KeyModifierControl,
+	}
+
+	addNewTimeEntryShortcut := AppShortcuts{
+		name:     "Add New Time Entry",
+		callback: func() { av.AddTimeEntry() },
+		keyname:  fyne.KeyN,
+		modifier: fyne.KeyModifierControl,
+	}
+
+	editSelectedTimeEntryShortcut := AppShortcuts{
+		name:     "Edit Selected Time Entry",
+		callback: func() { av.EditSelectedTimeEntry() },
+		keyname:  fyne.KeyE,
+		modifier: fyne.KeyModifierControl,
+	}
+
+	return []AppShortcuts{
+		unselectShortcut,
+		deleteSelectedTimeEntryShortcut,
+		addNewTimeEntryShortcut,
+		editSelectedTimeEntryShortcut,
+	}
 }

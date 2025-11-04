@@ -1,35 +1,76 @@
 package model
 
-type Weekday int
+type Weekday string
 
 const (
-	Monday Weekday = iota
-	Tuesday
-	Wednesday
-	Thursday
-	Friday
-	Saturday
-	Sunday
+	Monday    Weekday = "Monday"
+	Tuesday   Weekday = "Tuesday"
+	Wednesday Weekday = "Wednesday"
+	Thursday  Weekday = "Thursday"
+	Friday    Weekday = "Friday"
+	Saturday  Weekday = "Saturday"
+	Sunday    Weekday = "Sunday"
 )
 
-// Funktion zur Konvertierung von int zu Weekday
-func IntToWeekday(day int) Weekday {
+func StringToWeekday(day string) Weekday {
 	switch day {
-	case 0:
+	case "Monday":
 		return Monday
-	case 1:
+	case "Tuesday":
 		return Tuesday
-	case 2:
+	case "Wednesday":
 		return Wednesday
-	case 3:
+	case "Thursday":
 		return Thursday
-	case 4:
+	case "Friday":
 		return Friday
-	case 5:
+	case "Saturday":
 		return Saturday
-	case 6:
+	case "Sunday":
 		return Sunday
 	default:
 		return Monday // Standardwert, falls die Eingabe ungültig ist
+	}
+}
+
+func WeekdayToString(day Weekday) string {
+	switch day {
+	case Monday:
+		return "Monday"
+	case Tuesday:
+		return "Tuesday"
+	case Wednesday:
+		return "Wednesday"
+	case Thursday:
+		return "Thursday"
+	case Friday:
+		return "Friday"
+	case Saturday:
+		return "Saturday"
+	case Sunday:
+		return "Sunday"
+	default:
+		return "Monday" // Standardwert, falls die Eingabe ungültig ist
+	}
+}
+
+func ShortenWeekday(day string) string {
+	switch day {
+	case "Monday":
+		return "Mon"
+	case "Tuesday":
+		return "Tue"
+	case "Wednesday":
+		return "Wed"
+	case "Thursday":
+		return "Thu"
+	case "Friday":
+		return "Fri"
+	case "Saturday":
+		return "Sat"
+	case "Sunday":
+		return "Sun"
+	default:
+		return "Mon" // Standardwert, falls die Eingabe ungültig ist
 	}
 }
