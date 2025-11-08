@@ -61,11 +61,8 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	av.window = w
 
 	av.allOvertime = binding.NewString()
+	av.allOvertime.Set("Total Overtime: --")
 	av.spinner = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-	av.spinner.Start()
-	av.spinner.PostUpdate = func(s *spinner.Spinner) {
-		av.allOvertime.Set("Total Overtime: " + s.LastOutput)
-	}
 
 	extraColumns := len(av.baseHeaders)
 
