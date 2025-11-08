@@ -36,7 +36,66 @@ func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
 }
 
 func (r *SQLiteRepository) Migrate() error {
-	// TODO might be a good idea to move this to a separate file with history table
+	// Create schema_version table to track migrations
+	versionQuery := `
+	CREATE TABLE IF NOT EXISTS schema_version(
+		version INTEGER PRIMARY KEY,
+		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+	_, err := r.db.Exec(versionQuery)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// Get current schema version
+	currentVersion := r.getSchemaVersion()
+	log.Info("Current schema version", "version", currentVersion)
+
+	// Run migrations in order
+	migrations := []struct {
+		version int
+		up      func() error
+	}{
+		{1, r.migrationV1},
+		{2, r.migrationV2},
+	}
+
+	for _, migration := range migrations {
+		if currentVersion < migration.version {
+			log.Info("Running migration", "version", migration.version)
+			if err := migration.up(); err != nil {
+				log.Error("Migration failed", "version", migration.version, "error", err)
+				return err
+			}
+			if err := r.setSchemaVersion(migration.version); err != nil {
+				log.Error("Failed to update schema version", "version", migration.version, "error", err)
+				return err
+			}
+			log.Info("Migration completed", "version", migration.version)
+		}
+	}
+
+	return nil
+}
+
+func (r *SQLiteRepository) getSchemaVersion() int {
+	var version int
+	err := r.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&version)
+	if err != nil {
+		log.Warn("Failed to get schema version, assuming 0", "error", err)
+		return 0
+	}
+	return version
+}
+
+func (r *SQLiteRepository) setSchemaVersion(version int) error {
+	_, err := r.db.Exec("INSERT INTO schema_version(version) VALUES(?)", version)
+	return err
+}
+
+func (r *SQLiteRepository) migrationV1() error {
 	query := `
     CREATE TABLE IF NOT EXISTS workday(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,26 +118,38 @@ func (r *SQLiteRepository) Migrate() error {
 		enddate DATETIME NOT NULL UNIQUE
 	);
     `
-
 	_, err := r.db.Exec(query)
+	return err
+}
+
+func (r *SQLiteRepository) migrationV2() error {
+	// Check if overtime column already exists
+	var columnExists bool
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM pragma_table_info('workday') 
+		WHERE name = 'overtime'
+	`).Scan(&columnExists)
 	if err != nil {
-		log.Error(err)
 		return err
 	}
 
-	query = `
-		ALTER TABLE workday ADD COLUMN overtime TEXT DEFAULT "";
-
-		CREATE INDEX IF NOT EXISTS idx_worktime_workday ON worktime(workday);
-		CREATE INDEX IF NOT EXISTS idx_workday_date ON workday(date);
-	`
-	_, err = r.db.Exec(query)
-	if err != nil {
-		log.Warn(err)
-		// Ignoring error as columns might already exist
+	// Only add the column if it doesn't exist
+	if !columnExists {
+		_, err = r.db.Exec(`ALTER TABLE workday ADD COLUMN overtime TEXT DEFAULT ""`)
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	// Create indexes (these are safe to run multiple times)
+	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_worktime_workday ON worktime(workday)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_workday_date ON workday(date)`)
+	return err
 }
 
 func (r *SQLiteRepository) AddWorkday(workday *db.Workday) (*db.Workday, error) {
