@@ -6,6 +6,8 @@ toolchain go1.23.7
 
 require (
 	fyne.io/fyne/v2 v2.7.0
+	fyne.io/x/fyne v0.0.0-20250910205345-ecc79984d005
+	github.com/briandowns/spinner v1.23.2
 	github.com/charmbracelet/log v0.4.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/sdassow/fyne-datepicker v0.0.0-20241102094721-b3dc166af042
@@ -13,10 +15,8 @@ require (
 
 require (
 	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect
-	fyne.io/x/fyne v0.0.0-20250910205345-ecc79984d005 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/briandowns/spinner v1.23.2 // indirect
 	github.com/charmbracelet/lipgloss v0.10.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
@@ -36,7 +36,6 @@ require (
 	github.com/hack-pad/safejs v0.1.0 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
