@@ -142,7 +142,15 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 
 func (r *SQLiteRepository) GetAllWorkday(sorting SORTING) ([]*db.Workday, error) {
 	log.Debug("Getting all workdays")
-	query := fmt.Sprintf(`SELECT id, date, time, breaktime, overtime FROM workday ORDER BY date %s`, sorting)
+	var order string
+	switch sorting {
+	case "ASC", "DESC":
+		order = string(sorting)
+	default:
+		log.Warn("Invalid sorting value, defaulting to ASC", "sorting", sorting)
+		order = "ASC"
+	}
+	query := fmt.Sprintf(`SELECT id, date, time, breaktime, overtime FROM workday ORDER BY date %s`, order)
 
 	rows, err := r.db.Query(query)
 	if err != nil {
