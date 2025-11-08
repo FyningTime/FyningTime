@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/x/fyne/theme"
 	"github.com/charmbracelet/log"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -33,11 +34,12 @@ func main() {
 	log.Info("Welcome to " + progName)
 
 	a := app.NewWithID("com.github.fyningtime.fyningtime")
+	a.Settings().SetTheme(theme.AdwaitaTheme())
 	w := a.NewWindow(progName)
 
 	av := new(view.AppView)
 	av.CreateRepository(db)
-	av.SetBaseHeaders([]string{"Date", "Time / Break"})
+	av.SetBaseHeaders([]string{"Date", "Time", "Break", "Overtime"})
 
 	mv := av.CreateUI(w)
 	av.RefreshData()
@@ -87,7 +89,7 @@ func main() {
 		a.Quit()
 	})
 	w.SetContent(mv)
-	w.Resize(fyne.NewSize(800, 600))
+	w.Resize(fyne.NewSize(700, 600))
 	w.ShowAndRun()
 }
 
@@ -175,10 +177,18 @@ func CreateAppShortcuts(av *view.AppView) []AppShortcuts {
 		modifier: fyne.KeyModifierControl,
 	}
 
+	refreshDataShortcut := AppShortcuts{
+		name:     "Refresh Data",
+		callback: func() { av.RefreshData() },
+		keyname:  fyne.KeyR,
+		modifier: fyne.KeyModifierControl,
+	}
+
 	return []AppShortcuts{
 		unselectShortcut,
 		deleteSelectedTimeEntryShortcut,
 		addNewTimeEntryShortcut,
 		editSelectedTimeEntryShortcut,
+		refreshDataShortcut,
 	}
 }

@@ -12,10 +12,12 @@ import (
 	"github.com/FyningTime/FyningTime/app/repo"
 	"github.com/FyningTime/FyningTime/app/service"
 
+	"github.com/briandowns/spinner"
 	"github.com/charmbracelet/log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -33,6 +35,11 @@ type AppView struct {
 	// Represents the headers for the timetable
 	baseHeaders []string
 	headers     []string
+
+	// Dynamic data binding
+	allOvertime binding.String
+
+	spinner *spinner.Spinner
 
 	// Actual db abstraction
 	worktime  []*db.Worktime
@@ -53,6 +60,13 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	// Assign the window to the main app struct
 	av.window = w
 
+	av.allOvertime = binding.NewString()
+	av.spinner = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+	av.spinner.Start()
+	av.spinner.PostUpdate = func(s *spinner.Spinner) {
+		av.allOvertime.Set("Total Overtime: " + s.LastOutput)
+	}
+
 	extraColumns := len(av.baseHeaders)
 
 	tt := widget.NewTable(
@@ -64,7 +78,7 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 		},
 		func() fyne.CanvasObject {
 			// Defines how wide the cell is
-			return widget.NewLabel("10h54m18s / 45m")
+			return widget.NewLabel("08:00:00")
 		},
 		func(i widget.TableCellID, o fyne.CanvasObject) {
 			label := o.(*widget.Label)
@@ -87,16 +101,30 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 					" / " + model.ShortenWeekday(wd.Date.Weekday().String()))
 				label.TextStyle = fyne.TextStyle{Bold: true}
 			case 1:
-				label.SetText(wd.Time + " / " + wd.Breaktime)
-				label.TextStyle = fyne.TextStyle{Bold: false}
+				label.SetText(wd.Time)
+			case 2:
+				label.SetText(wd.Breaktime)
+			case 3:
+				overtimeAsFloat, err := time.ParseDuration(wd.Overtime)
+				if err != nil {
+					log.Error("Overtime table field", "overtime", wd.Overtime, "error", err)
+					label.SetText("")
+				} else {
+					if overtimeAsFloat < 0 {
+						label.TextStyle = fyne.TextStyle{Bold: true}
+						label.Importance = widget.HighImportance
+					}
+					label.SetText(wd.Overtime)
+				}
+
 			default:
 				if i.Col-extraColumns < len(wtday) && i.Col > 1 {
 					currentWt := wtday[i.Col-extraColumns]
-					if (i.Col%2 != 0 || len(wtday)%2 != 0) && currentWt.Type == "Begin" {
+					/*if (i.Col%2 != 0 || len(wtday)%2 != 0) && currentWt.Type == "Begin" {
 						label.TextStyle = fyne.TextStyle{Bold: false}
 					} else if (i.Col%2 == 0 || len(wtday)%2 == 0) && currentWt.Type == "End" {
 						label.TextStyle = fyne.TextStyle{Bold: false}
-					}
+					}*/
 					label.SetText(currentWt.Time.Format(time.TimeOnly))
 				} else {
 					label.SetText("")
@@ -110,6 +138,7 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 	}
 	tt.UpdateHeader = func(id widget.TableCellID, template fyne.CanvasObject) {
 		lbl := template.(*widget.Label)
+		lbl.TextStyle = fyne.TextStyle{Bold: true}
 
 		// Column headers (top row): Row == -1
 		if id.Row == -1 && id.Col >= 0 {
@@ -118,27 +147,55 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 			} else {
 				lbl.SetText("")
 			}
-			lbl.TextStyle = fyne.TextStyle{Bold: true}
+
 		}
 	}
 	tt.ShowHeaderRow = true
-	tt.StickyColumnCount = 2
+	tt.StickyColumnCount = 4
+
+	// Date
+	tt.SetColumnWidth(0, 125)
+	// Time
+	tt.SetColumnWidth(1, 90)
+	// Break
+	tt.SetColumnWidth(2, 80)
+	// Overtime
+	tt.SetColumnWidth(3, 85)
 
 	tt.OnSelected = func(id widget.TableCellID) {
 		av.selectedItem = &id
 	}
-	tt.Resize(fyne.NewSize(800, 600))
+	tt.Resize(fyne.NewSize(700, 600))
 
 	av.timetable = tt
 
 	btnAddTimeToolbarItem := widget.NewToolbarAction(theme.ContentAddIcon(), av.AddTimeEntry)
 	btnDeleteTimeToolbarItem := widget.NewToolbarAction(theme.ContentRemoveIcon(), av.deleteButtonFunc)
 	btnEditTimeToolbarItem := widget.NewToolbarAction(theme.DocumentIcon(), av.editButtonFunc)
+	btnRefreshDataToolbarItem := widget.NewToolbarAction(theme.ViewRefreshIcon(), func() {
+		fyne.Do(func() {
+			av.RefreshData()
+		})
+	})
 
-	timeToolbar := widget.NewToolbar(btnAddTimeToolbarItem,
-		btnDeleteTimeToolbarItem, btnEditTimeToolbarItem)
+	timeToolbar := widget.NewToolbar(
+		btnAddTimeToolbarItem,
+		btnDeleteTimeToolbarItem,
+		btnEditTimeToolbarItem,
+		btnRefreshDataToolbarItem,
+	)
 
-	timerContainer := container.NewBorder(timeToolbar, nil, nil, nil, tt)
+	topBar := container.NewHBox(
+		timeToolbar,
+		widget.NewSeparator(),
+		widget.NewLabelWithData(av.allOvertime),
+		widget.NewSeparator(),
+		/*widget.NewButtonWithIcon("Scroll up", theme.MoveUpIcon(), func() {
+			av.timetable.ScrollToTop()
+		}),*/
+	)
+
+	timerContainer := container.NewBorder(topBar, nil, nil, nil, tt)
 
 	av.cv = CreateCalendarView(av.window, av.vacations, time.Now())
 	av.vpv = CreateVacationPlannerView(av, av.repo, av.vacations)
@@ -153,7 +210,7 @@ func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
 
 	appContainer := container.NewBorder(nil, nil, nil, nil, appTabs)
 
-	go av.caclulateBreakLoop()
+	go av.calculateBreakLoop()
 	return appContainer
 }
 
@@ -245,6 +302,7 @@ func (av *AppView) UnselectTableItem() {
 	if av.selectedItem != nil {
 		log.Debug("Unselect item", "item", av.selectedItem)
 		av.timetable.Unselect(*av.selectedItem)
+		av.timetable.FocusLost()
 	} else {
 		dialog.ShowError(errors.New("no item selected"), av.window)
 	}
@@ -282,7 +340,9 @@ func (av *AppView) CreateRepository(db *sql.DB) {
 
 // TODO maybe limit this for a specific date range like month
 func (av *AppView) RefreshData() {
-	wd, wdErr := av.repo.GetAllWorkday()
+	av.spinner.Start()
+
+	wd, wdErr := av.repo.GetAllWorkday(repo.DESC)
 	if wdErr != nil {
 		log.Error(wdErr)
 	} else {
@@ -314,8 +374,14 @@ func (av *AppView) RefreshData() {
 		}
 	}
 
+	av.allOvertime.Set("Total Overtime: calculating...")
+	av.calculateOvertime()
+
 	// Re-build headers
 	av.refreshTimetable()
+
+	av.spinner.Stop()
+	av.spinner.LastOutput = ""
 }
 
 // ------------------ Private functions ------------------
@@ -516,7 +582,7 @@ func (av *AppView) editButtonFunc() {
 	}
 }
 
-func (av *AppView) caclulateBreakLoop() {
+func (av *AppView) calculateBreakLoop() {
 	for {
 		av.calculateBreak(false)
 	}
@@ -541,7 +607,7 @@ func (av *AppView) calculateBreak(skipWait ...bool) {
 	}
 	log.Info("Calculate breaktime")
 
-	wd, errWd := av.repo.GetAllWorkday()
+	wd, errWd := av.repo.GetAllWorkday(repo.DESC)
 	if errWd != nil {
 		log.Error(errWd)
 	}
@@ -659,6 +725,9 @@ func (av *AppView) refreshAll() {
 		av.vacations = v
 	}
 	fyne.Do(func() {
+		// Workaround
+		av.RefreshData()
+		av.calculateOvertime()
 		av.RefreshData()
 	})
 }
@@ -681,4 +750,85 @@ func (av *AppView) getLongestWorkday() int {
 		}
 	}
 	return longestDay
+}
+
+// Slice is a workaround as there is no optional parameters in Go
+func (av *AppView) calculateOvertime(previousOvertime ...time.Duration) {
+	log.Debug("Calculate overtime")
+
+	settings, err := service.ReadSettings()
+	if err != nil {
+		log.Fatal(err)
+		dialog.ShowError(err, av.window)
+		return
+	}
+
+	wd, err := av.repo.GetAllWorkday(repo.ASC)
+	if err != nil {
+		log.Error(err)
+		dialog.ShowError(err, av.window)
+	} else {
+		var totalOvertime time.Duration = 0 * time.Hour
+		var previousOvertimeTransfered time.Duration = 0 * time.Hour
+		var workHoursPerDayDuration time.Duration = getHoursPerDay(settings.WeekHours)
+		var importTotalOvertime time.Duration = time.Duration(settings.ImportOvertime * float64(time.Hour))
+
+		// Fake it till you make it
+		if len(previousOvertime) > 0 {
+			previousOvertimeTransfered = previousOvertime[0]
+		}
+
+		for _, w := range wd {
+			currentWorktimeDb, err := time.ParseDuration(w.Time)
+
+			log.Debug("Work hour per day", "duration", workHoursPerDayDuration.String())
+			midSumOvertime := (currentWorktimeDb - workHoursPerDayDuration)
+			if err != nil {
+				log.Error(err)
+				dialog.ShowError(err, av.window)
+			} else {
+				w.Overtime = midSumOvertime.String()
+				// Defer DB update to batch after loop
+				totalOvertime += midSumOvertime
+			}
+		}
+		// Batch update all overtimes in one DB call
+		if err := av.repo.UpdateOvertimesBatch(wd); err != nil {
+			log.Error("Batch update of overtimes failed", "error", err)
+			dialog.ShowError(err, av.window)
+		}
+
+		// Add previous overtime transfered from last calculation
+		totalOvertime += previousOvertimeTransfered
+
+		log.Debug("Previous overtime transfered", "overtime", previousOvertimeTransfered)
+
+		// Add imported overtime from settings
+		if importTotalOvertime > 0 {
+			totalOvertime += importTotalOvertime
+			log.Info("Import overtime", "overtime", importTotalOvertime)
+		}
+
+		if av.allOvertime == nil {
+			av.allOvertime = binding.NewString()
+		}
+
+		av.allOvertime.Set("Total Overtime: " + (totalOvertime + previousOvertimeTransfered).String())
+		log.Info("Total overtime", "overtime", totalOvertime+previousOvertimeTransfered)
+	}
+}
+
+// TODO Move logic from editButtonFunc here
+func (av *AppView) editSingleTimeEntry() {
+
+}
+
+func (av *AppView) editDateEntry() {
+
+}
+
+// Calculate hours per day, assuming 5 working days per week
+func getHoursPerDay(weekHours int) time.Duration {
+	weekHoursPerDay := float64(weekHours) / float64(5)
+	return time.Duration(weekHoursPerDay * float64(time.Hour))
 }

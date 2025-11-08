@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/FyningTime/FyningTime/app/model/db"
@@ -21,6 +22,13 @@ type SQLiteRepository struct {
 	db *sql.DB
 }
 
+type SORTING string
+
+const (
+	ASC  SORTING = "ASC"
+	DESC SORTING = "DESC"
+)
+
 func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
 	return &SQLiteRepository{
 		db: db,
@@ -28,7 +36,66 @@ func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
 }
 
 func (r *SQLiteRepository) Migrate() error {
-	// TODO might be a good idea to move this to a separate file with history table
+	// Create schema_version table to track migrations
+	versionQuery := `
+	CREATE TABLE IF NOT EXISTS schema_version(
+		version INTEGER PRIMARY KEY,
+		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+	_, err := r.db.Exec(versionQuery)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// Get current schema version
+	currentVersion := r.getSchemaVersion()
+	log.Info("Current schema version", "version", currentVersion)
+
+	// Run migrations in order
+	migrations := []struct {
+		version int
+		up      func() error
+	}{
+		{1, r.migrationV1},
+		{2, r.migrationV2},
+	}
+
+	for _, migration := range migrations {
+		if currentVersion < migration.version {
+			log.Info("Running migration", "version", migration.version)
+			if err := migration.up(); err != nil {
+				log.Error("Migration failed", "version", migration.version, "error", err)
+				return err
+			}
+			if err := r.setSchemaVersion(migration.version); err != nil {
+				log.Error("Failed to update schema version", "version", migration.version, "error", err)
+				return err
+			}
+			log.Info("Migration completed", "version", migration.version)
+		}
+	}
+
+	return nil
+}
+
+func (r *SQLiteRepository) getSchemaVersion() int {
+	var version int
+	err := r.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_version").Scan(&version)
+	if err != nil {
+		log.Warn("Failed to get schema version, assuming 0", "error", err)
+		return 0
+	}
+	return version
+}
+
+func (r *SQLiteRepository) setSchemaVersion(version int) error {
+	_, err := r.db.Exec("INSERT INTO schema_version(version) VALUES(?)", version)
+	return err
+}
+
+func (r *SQLiteRepository) migrationV1() error {
 	query := `
     CREATE TABLE IF NOT EXISTS workday(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,8 +118,37 @@ func (r *SQLiteRepository) Migrate() error {
 		enddate DATETIME NOT NULL UNIQUE
 	);
     `
-
 	_, err := r.db.Exec(query)
+	return err
+}
+
+func (r *SQLiteRepository) migrationV2() error {
+	// Check if overtime column already exists
+	var columnExists bool
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) > 0
+		FROM pragma_table_info('workday')
+		WHERE name = 'overtime'
+	`).Scan(&columnExists)
+	if err != nil {
+		return err
+	}
+
+	// Only add the column if it doesn't exist
+	if !columnExists {
+		_, err = r.db.Exec(`ALTER TABLE workday ADD COLUMN overtime TEXT DEFAULT ""`)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Create indexes (these are safe to run multiple times)
+	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_worktime_workday ON worktime(workday)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_workday_date ON workday(date)`)
 	return err
 }
 
@@ -95,7 +191,7 @@ func (r *SQLiteRepository) AddWorktime(worktime *db.Worktime) (*db.Worktime, err
 
 func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	log.Info("Getting workday", "date", date)
-	query := `SELECT id, date, time, breaktime 
+	query := `SELECT id, date, time, breaktime, overtime
 	from workday WHERE date = ? ORDER BY date DESC LIMIT 1`
 
 	var w db.Workday
@@ -104,7 +200,7 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	qd := date.In(loc).Format(time.DateOnly)
 	log.Debug("Query date", "date", qd)
 	err := r.db.QueryRow(query, qd).
-		Scan(&w.ID, &tmpDate, &w.Time, &w.Breaktime)
+		Scan(&w.ID, &tmpDate, &w.Time, &w.Breaktime, &w.Overtime)
 	w.Date = tmpDate
 
 	if err != nil {
@@ -115,9 +211,17 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	return &w, nil
 }
 
-func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
+func (r *SQLiteRepository) GetAllWorkday(sorting SORTING) ([]*db.Workday, error) {
 	log.Debug("Getting all workdays")
-	query := `SELECT id, date, time, breaktime FROM workday ORDER BY date DESC`
+	var order string
+	switch sorting {
+	case "ASC", "DESC":
+		order = string(sorting)
+	default:
+		log.Warn("Invalid sorting value, defaulting to ASC", "sorting", sorting)
+		order = "ASC"
+	}
+	query := fmt.Sprintf(`SELECT id, date, time, breaktime, overtime FROM workday ORDER BY date %s`, order)
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -128,7 +232,7 @@ func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
 	var workdays []*db.Workday
 	for rows.Next() {
 		var w db.Workday
-		err := rows.Scan(&w.ID, &w.Date, &w.Time, &w.Breaktime)
+		err := rows.Scan(&w.ID, &w.Date, &w.Time, &w.Breaktime, &w.Overtime)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -195,6 +299,39 @@ func (r *SQLiteRepository) DeleteWorkday(workday *db.Workday) (int64, error) {
 
 }
 
+func (r *SQLiteRepository) UpdateOvertimesBatch(workdays []*db.Workday) error {
+	log.Info("Updating overtimes batch", "workdays-size", len(workdays))
+	tx, err := r.db.Begin()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	stmt, err := tx.Prepare(`UPDATE workday SET overtime = ? WHERE id = ?`)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	defer stmt.Close()
+
+	for _, wd := range workdays {
+		_, err := stmt.Exec(wd.Overtime, wd.ID)
+		if err != nil {
+			log.Error(err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	return nil
+}
+
 func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) {
 	log.Info("Updating worktime", "worktime-id", worktime.ID)
 	query := `UPDATE worktime SET type = ?, time = ? WHERE id = ?`
@@ -211,7 +348,7 @@ func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) 
 
 func (r *SQLiteRepository) UpdateWorkday(workday *db.Workday) (int64, error) {
 	log.Info("Updating workday", "workday", workday)
-	query := `UPDATE workday 
+	query := `UPDATE workday
 		SET breaktime = ?, time = ?
 		WHERE id = ?`
 
@@ -284,4 +421,44 @@ func (r *SQLiteRepository) GetAllVacation() ([]*db.Vacation, error) {
 	log.Debug("Vacations", "size", len(v))
 
 	return v, nil
+}
+
+func (r *SQLiteRepository) DeleteVacation(vacation *db.Vacation) (int64, error) {
+	log.Info("Deleting vacation", "vacation-id", vacation.ID)
+	query := `DELETE FROM vacations WHERE id = ?`
+
+	res, err := r.db.Exec(query, vacation.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) UpdateVacation(vacation *db.Vacation) (int64, error) {
+	log.Info("Updating vacation", "vacation-id", vacation.ID)
+	query := `UPDATE vacations SET startdate = ?, enddate = ? WHERE id = ?`
+
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	startDate := vacation.StartDate.In(loc)
+	endDate := vacation.EndDate.In(loc)
+
+	res, err := r.db.Exec(query, startDate, endDate, vacation.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) UpdateOvertimes(workday *db.Workday) (int64, error) {
+	log.Info("Updating overtimes", "wd", workday)
+	query := `UPDATE workday SET overtime = ? WHERE id = ?`
+
+	res, err := r.db.Exec(query, workday.Overtime, workday.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
 }

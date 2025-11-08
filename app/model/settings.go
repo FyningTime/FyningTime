@@ -13,6 +13,9 @@ type Settings struct {
 	// Necessary for overtime working
 	WeekHours       int `json:"week_hours"`
 	MaxVacationDays int `json:"max_vacation_days"`
+
+	// Import total overtime from previous systems in hours
+	ImportOvertime float64 `json:"import_overtime"`
 }
 
 func NewSettings(savedPath string, savedDbPath string) *Settings {
@@ -29,5 +32,6 @@ func NewSettings(savedPath string, savedDbPath string) *Settings {
 		FirstDayOfWeek:  Monday,
 		MaxVacationDays: 30,
 		WeekHours:       40,
+		ImportOvertime:  0,
 	}
 }
