@@ -1,6 +1,7 @@
 package view
 
 import (
+	"errors"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -60,11 +61,19 @@ func GetSettingsView(w fyne.Window) *dialog.FormDialog {
 				dialog.ShowError(err, w)
 				return
 			}
+			if intWeekHours < 1 || intWeekHours > 168 {
+				dialog.ShowError(errors.New("Week hours must be between 1 and 168"), w)
+				return
+			}
 			settings.WeekHours = intWeekHours
 
 			intImportOvertime, err := strconv.ParseFloat(importTotalOvertime.Text, 64)
 			if err != nil {
 				dialog.ShowError(err, w)
+				return
+			}
+			if intImportOvertime < 0 {
+				dialog.ShowError(errors.New("Import total overtime cannot be negative"), w)
 				return
 			}
 			settings.ImportOvertime = intImportOvertime
