@@ -788,10 +788,14 @@ func (av *AppView) calculateOvertime(previousOvertime ...time.Duration) {
 				dialog.ShowError(err, av.window)
 			} else {
 				w.Overtime = midSumOvertime.String()
-				av.repo.UpdateOvertimes(w)
-
+				// Defer DB update to batch after loop
 				totalOvertime += midSumOvertime
 			}
+		}
+		// Batch update all overtimes in one DB call
+		if err := av.repo.UpdateOvertimesBatch(wd); err != nil {
+			log.Error("Batch update of overtimes failed", "error", err)
+			dialog.ShowError(err, av.window)
 		}
 
 		// Add previous overtime transfered from last calculation
