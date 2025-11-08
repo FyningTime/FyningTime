@@ -420,7 +420,7 @@ func (r *SQLiteRepository) UpdateVacation(vacation *db.Vacation) (int64, error) 
 
 func (r *SQLiteRepository) UpdateOvertimes(workday *db.Workday) (int64, error) {
 	log.Info("Updating overtimes", "wd", workday)
-	query := `UPDATE Workday SET overtime = ? WHERE id = ?`
+	query := `UPDATE workday SET overtime = ? WHERE id = ?`
 
 	res, err := r.db.Exec(query, workday.Overtime, workday.ID)
 	if err != nil {
