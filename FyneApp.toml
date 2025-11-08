@@ -1,8 +1,8 @@
 Website = "https://github.com/FyningTime"
 
 [Details]
-  Icon = "logo.png"
-  Name = "FyneTime"
-  ID = "com.github.fyningtime.fyningtime"
-  Version = "1.0.0"
-  Build = 2
+Icon = "logo.png"
+Name = "FyningTime"
+ID = "com.github.fyningtime.fyningtime"
+Version = "1.0.0"
+Build = 3

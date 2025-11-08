@@ -126,8 +126,8 @@ func (r *SQLiteRepository) migrationV2() error {
 	// Check if overtime column already exists
 	var columnExists bool
 	err := r.db.QueryRow(`
-		SELECT COUNT(*) > 0 
-		FROM pragma_table_info('workday') 
+		SELECT COUNT(*) > 0
+		FROM pragma_table_info('workday')
 		WHERE name = 'overtime'
 	`).Scan(&columnExists)
 	if err != nil {
@@ -297,6 +297,39 @@ func (r *SQLiteRepository) DeleteWorkday(workday *db.Workday) (int64, error) {
 		return resWt.RowsAffected()
 	}
 
+}
+
+func (r *SQLiteRepository) UpdateOvertimesBatch(workdays []*db.Workday) error {
+	log.Info("Updating overtimes batch", "workdays-size", len(workdays))
+	tx, err := r.db.Begin()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	stmt, err := tx.Prepare(`UPDATE workday SET overtime = ? WHERE id = ?`)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	defer stmt.Close()
+
+	for _, wd := range workdays {
+		_, err := stmt.Exec(wd.Overtime, wd.ID)
+		if err != nil {
+			log.Error(err)
+			tx.Rollback()
+			return err
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	return nil
 }
 
 func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) {
