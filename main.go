@@ -42,7 +42,7 @@ func main() {
 	av.SetBaseHeaders([]string{"Date", "Time", "Break", "Overtime"})
 
 	mv := av.CreateUI(w)
-	go av.RefreshData()
+	av.RefreshData()
 
 	// Set shortcuts
 	setShortcuts(w, CreateAppShortcuts(av))
