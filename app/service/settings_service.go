@@ -162,5 +162,10 @@ func validateSettings(s *model.Settings) (*model.Settings, error) {
 		s.MaxVacationDays = 30
 	}
 
+	if s.ImportOvertime < 0 { // 0 is the minimum
+		log.Warn("Import overtime is not set correctly. Set to 0 hours.")
+		s.ImportOvertime = 0
+	}
+
 	return s, err
 }

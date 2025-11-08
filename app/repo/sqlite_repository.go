@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/FyningTime/FyningTime/app/model/db"
@@ -20,6 +21,13 @@ var (
 type SQLiteRepository struct {
 	db *sql.DB
 }
+
+type SORTING string
+
+const (
+	ASC  SORTING = "ASC"
+	DESC SORTING = "DESC"
+)
 
 func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
 	return &SQLiteRepository{
@@ -53,7 +61,24 @@ func (r *SQLiteRepository) Migrate() error {
     `
 
 	_, err := r.db.Exec(query)
-	return err
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	query = `
+		ALTER TABLE workday ADD COLUMN overtime TEXT DEFAULT "";
+
+		CREATE INDEX IF NOT EXISTS idx_worktime_workday ON worktime(workday);
+		CREATE INDEX IF NOT EXISTS idx_workday_date ON workday(date);
+	`
+	_, err = r.db.Exec(query)
+	if err != nil {
+		log.Warn(err)
+		// Ignoring error as columns might already exist
+	}
+
+	return nil
 }
 
 func (r *SQLiteRepository) AddWorkday(workday *db.Workday) (*db.Workday, error) {
@@ -95,7 +120,7 @@ func (r *SQLiteRepository) AddWorktime(worktime *db.Worktime) (*db.Worktime, err
 
 func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	log.Info("Getting workday", "date", date)
-	query := `SELECT id, date, time, breaktime 
+	query := `SELECT id, date, time, breaktime, overtime
 	from workday WHERE date = ? ORDER BY date DESC LIMIT 1`
 
 	var w db.Workday
@@ -104,7 +129,7 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	qd := date.In(loc).Format(time.DateOnly)
 	log.Debug("Query date", "date", qd)
 	err := r.db.QueryRow(query, qd).
-		Scan(&w.ID, &tmpDate, &w.Time, &w.Breaktime)
+		Scan(&w.ID, &tmpDate, &w.Time, &w.Breaktime, &w.Overtime)
 	w.Date = tmpDate
 
 	if err != nil {
@@ -115,9 +140,9 @@ func (r *SQLiteRepository) GetWorkday(date time.Time) (*db.Workday, error) {
 	return &w, nil
 }
 
-func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
+func (r *SQLiteRepository) GetAllWorkday(sorting SORTING) ([]*db.Workday, error) {
 	log.Debug("Getting all workdays")
-	query := `SELECT id, date, time, breaktime FROM workday ORDER BY date DESC`
+	query := fmt.Sprintf(`SELECT id, date, time, breaktime, overtime FROM workday ORDER BY date %s`, sorting)
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -128,7 +153,7 @@ func (r *SQLiteRepository) GetAllWorkday() ([]*db.Workday, error) {
 	var workdays []*db.Workday
 	for rows.Next() {
 		var w db.Workday
-		err := rows.Scan(&w.ID, &w.Date, &w.Time, &w.Breaktime)
+		err := rows.Scan(&w.ID, &w.Date, &w.Time, &w.Breaktime, &w.Overtime)
 		if err != nil {
 			log.Error(err)
 			return nil, err
@@ -211,7 +236,7 @@ func (r *SQLiteRepository) UpdateWorktime(worktime *db.Worktime) (int64, error) 
 
 func (r *SQLiteRepository) UpdateWorkday(workday *db.Workday) (int64, error) {
 	log.Info("Updating workday", "workday", workday)
-	query := `UPDATE workday 
+	query := `UPDATE workday
 		SET breaktime = ?, time = ?
 		WHERE id = ?`
 
@@ -284,4 +309,44 @@ func (r *SQLiteRepository) GetAllVacation() ([]*db.Vacation, error) {
 	log.Debug("Vacations", "size", len(v))
 
 	return v, nil
+}
+
+func (r *SQLiteRepository) DeleteVacation(vacation *db.Vacation) (int64, error) {
+	log.Info("Deleting vacation", "vacation-id", vacation.ID)
+	query := `DELETE FROM vacations WHERE id = ?`
+
+	res, err := r.db.Exec(query, vacation.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) UpdateVacation(vacation *db.Vacation) (int64, error) {
+	log.Info("Updating vacation", "vacation-id", vacation.ID)
+	query := `UPDATE vacations SET startdate = ?, enddate = ? WHERE id = ?`
+
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	startDate := vacation.StartDate.In(loc)
+	endDate := vacation.EndDate.In(loc)
+
+	res, err := r.db.Exec(query, startDate, endDate, vacation.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *SQLiteRepository) UpdateOvertimes(workday *db.Workday) (int64, error) {
+	log.Info("Updating overtimes", "wd", workday)
+	query := `UPDATE Workday SET overtime = ? WHERE id = ?`
+
+	res, err := r.db.Exec(query, workday.Overtime, workday.ID)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	return res.RowsAffected()
 }

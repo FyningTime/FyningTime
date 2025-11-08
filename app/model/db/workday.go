@@ -7,4 +7,5 @@ type Workday struct {
 	Date      time.Time
 	Time      string
 	Breaktime string
+	Overtime  string
 }
