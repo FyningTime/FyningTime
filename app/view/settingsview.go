@@ -37,8 +37,14 @@ func GetSettingsView(w fyne.Window, a fyne.App) *dialog.FormDialog {
 	weekHours := widget.NewEntry()
 	weekHours.SetText(strconv.Itoa(settings.WeekHours))
 
+	lockImportOvertime := widget.NewCheck(lang.L("lockImportOvertime"), nil)
+	lockImportOvertime.SetChecked(settings.LockImportOvertime)
+
 	importTotalOvertime := widget.NewEntry()
 	importTotalOvertime.SetText(strconv.FormatFloat(settings.ImportOvertime, 'f', -1, 64))
+	if settings.LockImportOvertime {
+		importTotalOvertime.Disable()
+	}
 
 	maxVacations := widget.NewEntry()
 	maxVacations.SetText(strconv.Itoa(settings.MaxVacationDays))
@@ -66,6 +72,7 @@ func GetSettingsView(w fyne.Window, a fyne.App) *dialog.FormDialog {
 		{Text: lang.L("maxVacations"), Widget: maxVacations},
 		{Text: lang.L("importTotalOvertime"), Widget: importTotalOvertime},
 		{Text: lang.L("theme"), Widget: themeSelection},
+		{Text: lang.L("lockImportOvertime"), Widget: lockImportOvertime},
 	}
 	dia := dialog.NewForm(lang.L("settings"), lang.L("save"), lang.L("cancel"), form, func(ok bool) {
 		if ok {
@@ -100,6 +107,7 @@ func GetSettingsView(w fyne.Window, a fyne.App) *dialog.FormDialog {
 				return
 			}
 			settings.ImportOvertime = intImportOvertime
+			settings.LockImportOvertime = lockImportOvertime.Checked
 
 			settings.RefreshTimeUi, err = strconv.Atoi(refreshTimeUi.Text)
 
