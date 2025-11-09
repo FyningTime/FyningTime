@@ -31,11 +31,7 @@ const (
 	maxVacationDaysDefault = 30
 	importOvertimeDefault  = 0
 	refreshTimeUiDefault   = 300 // in seconds
-<<<<<<< HEAD
-	themeVariantDefault    = 0   // 0=light/auto, 1=dark
-=======
 	themeVariantDefault    = 0   // 0=auto, 1=dark, 2=light
->>>>>>> origin/main
 )
 
 func ReadProperties(a fyne.App) *model.Settings {
