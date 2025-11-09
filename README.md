@@ -1,6 +1,10 @@
 # FyningTime
 
+<<<<<<< HEAD
 FyningTime (based on the Go framework Fyne) helps to tracks down your work time.
+=======
+FyningTime (based on the Go framework Fyne) helps to track down your work time.
+>>>>>>> origin/main
 
 ## Features which are planned:
 

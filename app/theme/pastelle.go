@@ -175,7 +175,11 @@ func darken(c color.NRGBA, p float32) color.NRGBA {
 func hex(s string) color.NRGBA {
 	// Expect "#RRGGBB"
 	if len(s) != 7 || s[0] != '#' {
+<<<<<<< HEAD
 		return color.NRGBA{A: 0xFF} // fallback to transparent black if malformed
+=======
+		return color.NRGBA{A: 0xFF} // fallback to opaque black if malformed
+>>>>>>> origin/main
 	}
 	r := (hexNibble(s[1]) << 4) | hexNibble(s[2])
 	g := (hexNibble(s[3]) << 4) | hexNibble(s[4])
