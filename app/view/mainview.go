@@ -12,7 +12,6 @@ import (
 	"github.com/FyningTime/FyningTime/app/repo"
 	"github.com/FyningTime/FyningTime/app/service"
 
-	"github.com/briandowns/spinner"
 	"github.com/charmbracelet/log"
 
 	"fyne.io/fyne/v2"
@@ -26,6 +25,7 @@ import (
 type AppView struct {
 	// Holds the main window
 	window fyne.Window
+	a      fyne.App
 
 	// timetable *widget.Table represents a table widget used in the AppView struct.
 	timetable *widget.Table
@@ -38,8 +38,6 @@ type AppView struct {
 
 	// Dynamic data binding
 	allOvertime binding.String
-
-	spinner *spinner.Spinner
 
 	// Actual db abstraction
 	worktime  []*db.Worktime
@@ -56,16 +54,13 @@ type AppView struct {
 	repo *repo.SQLiteRepository
 }
 
-func (av *AppView) CreateUI(w fyne.Window) *fyne.Container {
+func (av *AppView) CreateUI(w fyne.Window, a fyne.App) *fyne.Container {
 	// Assign the window to the main app struct
 	av.window = w
+	av.a = a
 
 	av.allOvertime = binding.NewString()
-	av.spinner = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-	av.spinner.Start()
-	av.spinner.PostUpdate = func(s *spinner.Spinner) {
-		av.allOvertime.Set("Total Overtime: " + s.LastOutput)
-	}
+	av.allOvertime.Set("Total Overtime: calculating...")
 
 	extraColumns := len(av.baseHeaders)
 
@@ -340,8 +335,6 @@ func (av *AppView) CreateRepository(db *sql.DB) {
 
 // TODO maybe limit this for a specific date range like month
 func (av *AppView) RefreshData() {
-	av.spinner.Start()
-
 	wd, wdErr := av.repo.GetAllWorkday(repo.DESC)
 	if wdErr != nil {
 		log.Error(wdErr)
@@ -379,9 +372,15 @@ func (av *AppView) RefreshData() {
 
 	// Re-build headers
 	av.refreshTimetable()
+}
 
-	av.spinner.Stop()
-	av.spinner.LastOutput = ""
+func (av *AppView) GetOvertime() string {
+	totalOvertime, err := av.allOvertime.Get()
+	if err != nil {
+		log.Error(err)
+		return ""
+	}
+	return totalOvertime
 }
 
 // ------------------ Private functions ------------------
@@ -594,10 +593,7 @@ and refreshes the data
 */
 func (av *AppView) calculateBreak(skipWait ...bool) {
 	// Run this all time in the background
-	settings, err := service.ReadSettings()
-	if err != nil {
-		log.Fatal(err)
-	}
+	settings := service.ReadProperties(av.a)
 
 	if len(skipWait) > 0 && !skipWait[0] {
 		// Wait until the time to sleep
@@ -756,12 +752,7 @@ func (av *AppView) getLongestWorkday() int {
 func (av *AppView) calculateOvertime(previousOvertime ...time.Duration) {
 	log.Debug("Calculate overtime")
 
-	settings, err := service.ReadSettings()
-	if err != nil {
-		log.Fatal(err)
-		dialog.ShowError(err, av.window)
-		return
-	}
+	settings := service.ReadProperties(av.a)
 
 	wd, err := av.repo.GetAllWorkday(repo.ASC)
 	if err != nil {
@@ -777,11 +768,11 @@ func (av *AppView) calculateOvertime(previousOvertime ...time.Duration) {
 		if len(previousOvertime) > 0 {
 			previousOvertimeTransfered = previousOvertime[0]
 		}
+		log.Debug("Work hour per day", "duration", workHoursPerDayDuration.String())
 
 		for _, w := range wd {
 			currentWorktimeDb, err := time.ParseDuration(w.Time)
 
-			log.Debug("Work hour per day", "duration", workHoursPerDayDuration.String())
 			midSumOvertime := (currentWorktimeDb - workHoursPerDayDuration)
 			if err != nil {
 				log.Error(err)

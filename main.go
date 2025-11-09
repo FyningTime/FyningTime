@@ -3,15 +3,17 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 
 	"github.com/FyningTime/FyningTime/app/service"
+	apptheme "github.com/FyningTime/FyningTime/app/theme"
 	"github.com/FyningTime/FyningTime/app/view"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/x/fyne/theme"
+
 	"github.com/charmbracelet/log"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -20,28 +22,35 @@ func main() {
 	var devFlag bool
 	initLogging(devFlag)
 
+	progName := "FyningTime"
+	log.Info("Welcome to " + progName)
+	a := app.NewWithID("com.github.fyningtime.fyningtime")
+
 	// Read settings
-	settings, err := service.ReadSettings()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debugf("Settings file: %+v\n", settings)
+	settings := service.ReadProperties(a)
+	log.Debugf("Settings: %+v", settings)
 
 	// Open database
 	db := GetDB(settings.SavedDbPath)
 
-	progName := "FyningTime"
-	log.Info("Welcome to " + progName)
+	switch settings.ThemeVariant {
+	case 1:
+		a.Settings().SetTheme(apptheme.NewPastelleDark())
 
-	a := app.NewWithID("com.github.fyningtime.fyningtime")
-	a.Settings().SetTheme(theme.AdwaitaTheme())
+	case 2:
+		a.Settings().SetTheme(apptheme.NewPastelleLight())
+
+	default:
+		a.Settings().SetTheme(apptheme.NewPastelleTheme())
+	}
+
 	w := a.NewWindow(progName)
 
 	av := new(view.AppView)
 	av.CreateRepository(db)
 	av.SetBaseHeaders([]string{"Date", "Time", "Break", "Overtime"})
 
-	mv := av.CreateUI(w)
+	mv := av.CreateUI(w, a)
 	av.RefreshData()
 
 	// Set shortcuts
@@ -52,15 +61,11 @@ func main() {
 			fyne.NewMenuItem("Add current time", func() {
 				av.AddTimeEntry()
 			}),
-			// TODO Show overtime in dialog
-			// fyne.NewMenuItem("Show overtime", func() {
-			// 	overtime, err := av.GetOvertime()
-			// 	if err != nil {
-			// 		dialog.ShowError(err, w)
-			// 		return
-			// 	}
-			// 	dialog.ShowInformation("Overtime", fmt.Sprintf("Current overtime: %s", overtime.String()), w)
-			// }),
+			// Show overtime in dialog
+			fyne.NewMenuItem("Show overtime", func() {
+				overtime := av.GetOvertime()
+				dialog.ShowInformation("Overtime", fmt.Sprintf("Current overtime: %s", overtime), w)
+			}),
 			fyne.NewMenuItem("About", func() {
 				dialog.NewInformation("About",
 					"FyningTime is a simple time tracking application", w)
@@ -78,7 +83,7 @@ func main() {
 						"FyningTime is a simple time tracking application", w)
 				}),
 				fyne.NewMenuItem("Settings", func() {
-					view.GetSettingsView(w).Show()
+					view.GetSettingsView(w, a).Show()
 				})),
 		),
 	)
