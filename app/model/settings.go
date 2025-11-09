@@ -15,7 +15,8 @@ type Settings struct {
 	MaxVacationDays int `json:"max_vacation_days"`
 
 	// Import total overtime from previous systems in hours
-	ImportOvertime float64 `json:"import_overtime"`
+	ImportOvertime     float64 `json:"import_overtime"`
+	LockImportOvertime bool    `json:"lock_import_overtime"`
 }
 
 func NewSettings(savedPath string, savedDbPath string) *Settings {
@@ -29,9 +30,10 @@ func NewSettings(savedPath string, savedDbPath string) *Settings {
 		ThemeVariant:  0,
 
 		// Business logic specific configuration
-		FirstDayOfWeek:  Monday,
-		MaxVacationDays: 30,
-		WeekHours:       40,
-		ImportOvertime:  0,
+		FirstDayOfWeek:     Monday,
+		MaxVacationDays:    30,
+		WeekHours:          40,
+		ImportOvertime:     0,
+		LockImportOvertime: false,
 	}
 }

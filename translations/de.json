@@ -33,6 +33,7 @@
   "timeWithFormat": "Zeit im Format hh:mm:ss eingeben",
   "type": "Typ",
   "hintTextOldEntry": "Vorheriger Eintrag",
+  "lockImportOvertime": "Importierte Überstunden sperren",
 
   "yes": "Ja",
   "no": "Nein",

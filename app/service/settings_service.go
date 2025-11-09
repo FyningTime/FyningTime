@@ -49,6 +49,8 @@ func ReadProperties(a fyne.App) *model.Settings {
 	settings.ImportOvertime = a.Preferences().FloatWithFallback(importOvertimeProperty, importOvertimeDefault)
 	settings.RefreshTimeUi = a.Preferences().IntWithFallback(refreshTimeUiProperty, refreshTimeUiDefault)
 	settings.ThemeVariant = a.Preferences().IntWithFallback(themeVariantProperty, themeVariantDefault)
+	settings.LockImportOvertime = a.Preferences().BoolWithFallback("lockImportOvertime", false)
+
 	return settings
 }
 
@@ -59,6 +61,7 @@ func WriteProperties(a fyne.App, s *model.Settings) {
 	a.Preferences().SetFloat("importOvertime", s.ImportOvertime)
 	a.Preferences().SetInt("refreshTimeUi", s.RefreshTimeUi)
 	a.Preferences().SetInt("themeVariant", s.ThemeVariant)
+	a.Preferences().SetBool("lockImportOvertime", s.LockImportOvertime)
 }
 
 /**

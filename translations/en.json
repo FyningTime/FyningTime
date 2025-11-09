@@ -33,6 +33,7 @@
   "timeWithFormat": "Enter time in format hh:mm:ss",
   "type": "Type",
   "hintTextOldEntry": "Previous entry",
+  "lockImportOvertime": "Lock imported overtime",
 
   "yes": "Yes",
   "no": "No",
