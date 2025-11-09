@@ -1,95 +1,64 @@
 package service
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 
+	"fyne.io/fyne/v2"
 	"github.com/charmbracelet/log"
 
 	"github.com/FyningTime/FyningTime/app/model"
 )
 
-func ReadSettings() (*model.Settings, error) {
-	settingsFilePath, err := GetFyningTimePath()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	file, err := os.Open(settingsFilePath)
-	if err != nil && file == nil {
-		log.Error(err)
-		// Create settings file if it doesn't exist
-		log.Infof("Creating settings file, %s ", settingsFilePath)
-
-		dbPath, err := GetFyningTimePath(model.DBFILE)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		settings := model.NewSettings(
-			settingsFilePath, dbPath,
-		)
-
-		createError := WriteSettings(settings)
-		if createError != nil {
-			log.Error(createError)
-			return nil, createError
-		}
-		file, _ = os.Open(settingsFilePath)
-	}
-	defer file.Close()
-
-	settings := model.Settings{}
-	byteValue, err := io.ReadAll(file)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-
-	err = json.Unmarshal(byteValue, &settings)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-	defer file.Close()
-
-	return validateSettings(&settings)
+type SettingsProperty struct {
+	property string
+	value    any
 }
 
-func WriteSettings(s *model.Settings) error {
-	log.Debugf("Writing settings: %+v\n", s)
-	validateSettings(s)
-	settingsFilePath, err := GetFyningTimePath()
+const (
+	// Settings property names
+	weekHoursProperty       = "weekHours"
+	firstDayOfWeekProperty  = "firstDayOfWeek"
+	maxVacationDaysProperty = "maxVacationDays"
+	importOvertimeProperty  = "importOvertime"
+	refreshTimeUiProperty   = "refreshTimeUi"
+	themeVariantProperty    = "themeVariant"
+
+	// Default settings values
+	weekHoursDefault       = 40
+	firstDayOfWeekDefault  = model.Monday // Monday
+	maxVacationDaysDefault = 30
+	importOvertimeDefault  = 0
+	refreshTimeUiDefault   = 300 // in seconds
+	themeVariantDefault    = 0   // 0=light/auto, 1=dark
+)
+
+func ReadProperties(a fyne.App) *model.Settings {
+	dbPath, err := GetFyningTimePath(model.DBFILE)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	file, err := os.OpenFile(settingsFilePath, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		newFile, err := os.Create(settingsFilePath)
-		if err != nil {
-			log.Fatal(err)
-			return err
-		}
-		file = newFile
-	}
-	//defer file.Close()
+	settings := model.NewSettings(
+		"", dbPath,
+	)
+	settings.WeekHours = a.Preferences().IntWithFallback(weekHoursProperty, weekHoursDefault)
+	settings.FirstDayOfWeek = model.Weekday(a.Preferences().StringWithFallback(firstDayOfWeekProperty, model.WeekdayToString(firstDayOfWeekDefault)))
+	settings.MaxVacationDays = a.Preferences().IntWithFallback(maxVacationDaysProperty, maxVacationDaysDefault)
+	settings.ImportOvertime = a.Preferences().FloatWithFallback(importOvertimeProperty, importOvertimeDefault)
+	settings.RefreshTimeUi = a.Preferences().IntWithFallback(refreshTimeUiProperty, refreshTimeUiDefault)
+	settings.ThemeVariant = a.Preferences().IntWithFallback(themeVariantProperty, themeVariantDefault)
+	return settings
+}
 
-	byteValue, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-	_, err = file.Write(byteValue)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-	defer file.Close()
-	return nil
+func WriteProperties(a fyne.App, s *model.Settings) {
+	a.Preferences().SetInt("weekHours", s.WeekHours)
+	a.Preferences().SetString("firstDayOfWeek", model.WeekdayToString(s.FirstDayOfWeek))
+	a.Preferences().SetInt("maxVacationDays", s.MaxVacationDays)
+	a.Preferences().SetFloat("importOvertime", s.ImportOvertime)
+	a.Preferences().SetInt("refreshTimeUi", s.RefreshTimeUi)
+	a.Preferences().SetInt("themeVariant", s.ThemeVariant)
 }
 
 /**
