@@ -22,4 +22,4 @@ For more see issues tagged as feature: https://github.com/FyningTime/FyningTime/
 
 **WIP!**
 
-![Main Window](FyningTime-Timer-Screenshot.jpg)
+![Main Window](./screenshots/FyningTime-Timer-Screenshot.jpg)
