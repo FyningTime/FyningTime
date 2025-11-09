@@ -1,5 +1,7 @@
 package model
 
+import "fyne.io/fyne/v2/lang"
+
 type Weekday string
 
 const (
@@ -14,19 +16,19 @@ const (
 
 func StringToWeekday(day string) Weekday {
 	switch day {
-	case "Monday":
+	case lang.L("monday"):
 		return Monday
-	case "Tuesday":
+	case lang.L("tuesday"):
 		return Tuesday
-	case "Wednesday":
+	case lang.L("wednesday"):
 		return Wednesday
-	case "Thursday":
+	case lang.L("thursday"):
 		return Thursday
-	case "Friday":
+	case lang.L("friday"):
 		return Friday
-	case "Saturday":
+	case lang.L("saturday"):
 		return Saturday
-	case "Sunday":
+	case lang.L("sunday"):
 		return Sunday
 	default:
 		return Monday // Standardwert, falls die Eingabe ungültig ist
@@ -36,41 +38,41 @@ func StringToWeekday(day string) Weekday {
 func WeekdayToString(day Weekday) string {
 	switch day {
 	case Monday:
-		return "Monday"
+		return lang.L("monday")
 	case Tuesday:
-		return "Tuesday"
+		return lang.L("tuesday")
 	case Wednesday:
-		return "Wednesday"
+		return lang.L("wednesday")
 	case Thursday:
-		return "Thursday"
+		return lang.L("thursday")
 	case Friday:
-		return "Friday"
+		return lang.L("friday")
 	case Saturday:
-		return "Saturday"
+		return lang.L("saturday")
 	case Sunday:
-		return "Sunday"
+		return lang.L("sunday")
 	default:
-		return "Monday" // Standardwert, falls die Eingabe ungültig ist
+		return lang.L("monday") // Standardwert, falls die Eingabe ungültig ist
 	}
 }
 
 func ShortenWeekday(day string) string {
 	switch day {
 	case "Monday":
-		return "Mon"
+		return lang.L("mondayShort")
 	case "Tuesday":
-		return "Tue"
+		return lang.L("tuesdayShort")
 	case "Wednesday":
-		return "Wed"
+		return lang.L("wednesdayShort")
 	case "Thursday":
-		return "Thu"
+		return lang.L("thursdayShort")
 	case "Friday":
-		return "Fri"
+		return lang.L("fridayShort")
 	case "Saturday":
-		return "Sat"
+		return lang.L("saturdayShort")
 	case "Sunday":
-		return "Sun"
+		return lang.L("sundayShort")
 	default:
-		return "Mon" // Standardwert, falls die Eingabe ungültig ist
+		return lang.L("mondayShort") // Standardwert, falls die Eingabe ungültig ist
 	}
 }

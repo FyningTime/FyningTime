@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"embed"
 	"flag"
 	"fmt"
 
@@ -13,10 +14,14 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/lang"
 
 	"github.com/charmbracelet/log"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed translations
+var translations embed.FS
 
 func main() {
 	var devFlag bool
@@ -25,6 +30,9 @@ func main() {
 	progName := "FyningTime"
 	log.Info("Welcome to " + progName)
 	a := app.NewWithID("com.github.fyningtime.fyningtime")
+
+	// Load translations
+	lang.AddTranslationsFS(translations, "translations")
 
 	// Read settings
 	settings := service.ReadProperties(a)
@@ -36,10 +44,8 @@ func main() {
 	switch settings.ThemeVariant {
 	case 1:
 		a.Settings().SetTheme(apptheme.NewPastelleDark())
-
 	case 2:
 		a.Settings().SetTheme(apptheme.NewPastelleLight())
-
 	default:
 		a.Settings().SetTheme(apptheme.NewPastelleTheme())
 	}
@@ -48,7 +54,10 @@ func main() {
 
 	av := new(view.AppView)
 	av.CreateRepository(db)
-	av.SetBaseHeaders([]string{"Date", "Time", "Break", "Overtime"})
+	av.SetBaseHeaders([]string{
+		lang.L("date"), lang.L("time"),
+		lang.L("Pause"), lang.L("overtime")},
+	)
 
 	mv := av.CreateUI(w, a)
 	av.RefreshData()
@@ -57,18 +66,17 @@ func main() {
 	setShortcuts(w, CreateAppShortcuts(av))
 
 	if desk, ok := a.(desktop.App); ok {
-		m := fyne.NewMenu("FyneTime",
-			fyne.NewMenuItem("Add current time", func() {
+		m := fyne.NewMenu("FyningTime",
+			fyne.NewMenuItem(lang.L("addTimeEntry"), func() {
 				av.AddTimeEntry()
 			}),
 			// Show overtime in dialog
-			fyne.NewMenuItem("Show overtime", func() {
+			fyne.NewMenuItem(lang.L("showOvertime"), func() {
 				overtime := av.GetOvertime()
-				dialog.ShowInformation("Overtime", fmt.Sprintf("Current overtime: %s", overtime), w)
+				dialog.ShowInformation("Overtime", fmt.Sprintf(lang.L("currentOvertime")+": %s", overtime), w)
 			}),
-			fyne.NewMenuItem("About", func() {
-				dialog.NewInformation("About",
-					"FyningTime is a simple time tracking application", w)
+			fyne.NewMenuItem(lang.L("about"), func() {
+				dialog.NewInformation(lang.L("about"), lang.L("about-ft"), w)
 			}),
 		)
 
@@ -77,14 +85,14 @@ func main() {
 
 	w.SetMainMenu(
 		fyne.NewMainMenu(
-			fyne.NewMenu("File",
-				fyne.NewMenuItem("About", func() {
-					dialog.ShowInformation("About",
-						"FyningTime is a simple time tracking application", w)
-				}),
-				fyne.NewMenuItem("Settings", func() {
+			fyne.NewMenu(lang.L("file"),
+				fyne.NewMenuItem(lang.L("settings"), func() {
 					view.GetSettingsView(w, a).Show()
-				})),
+				}),
+				fyne.NewMenuItem(lang.L("about"), func() {
+					dialog.ShowInformation(lang.L("about"), lang.L("about-ft"), w)
+				}),
+			),
 		),
 	)
 

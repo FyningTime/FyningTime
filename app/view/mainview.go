@@ -18,6 +18,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/lang"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -60,7 +61,7 @@ func (av *AppView) CreateUI(w fyne.Window, a fyne.App) *fyne.Container {
 	av.a = a
 
 	av.allOvertime = binding.NewString()
-	av.allOvertime.Set("Total Overtime: calculating...")
+	av.allOvertime.Set(lang.L("calculateOvertime"))
 
 	extraColumns := len(av.baseHeaders)
 
@@ -73,7 +74,7 @@ func (av *AppView) CreateUI(w fyne.Window, a fyne.App) *fyne.Container {
 		},
 		func() fyne.CanvasObject {
 			// Defines how wide the cell is
-			return widget.NewLabel("08:00:00")
+			return widget.NewLabel(lang.L("begin") + " #1")
 		},
 		func(i widget.TableCellID, o fyne.CanvasObject) {
 			label := o.(*widget.Label)
@@ -115,11 +116,6 @@ func (av *AppView) CreateUI(w fyne.Window, a fyne.App) *fyne.Container {
 			default:
 				if i.Col-extraColumns < len(wtday) && i.Col > 1 {
 					currentWt := wtday[i.Col-extraColumns]
-					/*if (i.Col%2 != 0 || len(wtday)%2 != 0) && currentWt.Type == "Begin" {
-						label.TextStyle = fyne.TextStyle{Bold: false}
-					} else if (i.Col%2 == 0 || len(wtday)%2 == 0) && currentWt.Type == "End" {
-						label.TextStyle = fyne.TextStyle{Bold: false}
-					}*/
 					label.SetText(currentWt.Time.Format(time.TimeOnly))
 				} else {
 					label.SetText("")
@@ -155,7 +151,7 @@ func (av *AppView) CreateUI(w fyne.Window, a fyne.App) *fyne.Container {
 	// Break
 	tt.SetColumnWidth(2, 80)
 	// Overtime
-	tt.SetColumnWidth(3, 85)
+	tt.SetColumnWidth(3, 95)
 
 	tt.OnSelected = func(id widget.TableCellID) {
 		av.selectedItem = &id
@@ -197,10 +193,10 @@ func (av *AppView) CreateUI(w fyne.Window, a fyne.App) *fyne.Container {
 
 	// Add appbar
 	appTabs := container.NewAppTabs(
-		container.NewTabItem("Timer", timerContainer),
-		container.NewTabItem("Calendar", av.cv.container),
-		container.NewTabItem("Vacations Planner", av.vpv.container),
-		container.NewTabItem("Details", widget.NewLabel("Comes in future! 😁")),
+		container.NewTabItem(lang.L("timer"), timerContainer),
+		container.NewTabItem(lang.L("calendar"), av.cv.container),
+		container.NewTabItem(lang.L("vacationPlanner"), av.vpv.container),
+		container.NewTabItem(lang.L("details"), widget.NewLabel(lang.L("commingSoon"))),
 	)
 
 	appContainer := container.NewBorder(nil, nil, nil, nil, appTabs)
@@ -227,9 +223,9 @@ func (av *AppView) buildHeaders() {
 	for i := range longest {
 		// Option A: Label them as Begin/End pairs
 		if i%2 == 0 {
-			headers = append(headers, "Begin #"+strconv.Itoa(i/2+1))
+			headers = append(headers, lang.L("begin")+" #"+strconv.Itoa(i/2+1))
 		} else {
-			headers = append(headers, "End #"+strconv.Itoa(i/2+1))
+			headers = append(headers, lang.L("end")+" #"+strconv.Itoa(i/2+1))
 		}
 	}
 
@@ -299,7 +295,7 @@ func (av *AppView) UnselectTableItem() {
 		av.timetable.Unselect(*av.selectedItem)
 		av.timetable.FocusLost()
 	} else {
-		dialog.ShowError(errors.New("no item selected"), av.window)
+		dialog.ShowError(errors.New(lang.L("noItemSelected")), av.window)
 	}
 }
 
@@ -310,7 +306,7 @@ func (av *AppView) DeleteSelectedTimeEntry() {
 			dialog.ShowError(err, av.window)
 			return
 		} else if wt == nil {
-			dialog.ShowError(errors.New("no time entry found"), av.window)
+			dialog.ShowError(errors.New(lang.L("noTimeEntryFound")), av.window)
 			return
 		}
 		log.Info("Delete selected time entry", "worktime", wt)
@@ -367,7 +363,7 @@ func (av *AppView) RefreshData() {
 		}
 	}
 
-	av.allOvertime.Set("Total Overtime: calculating...")
+	av.allOvertime.Set(lang.L("calculateOvertime"))
 	av.calculateOvertime()
 
 	// Re-build headers
@@ -389,10 +385,10 @@ func (av *AppView) deleteButtonFunc() {
 	log.Info("Delete time entry", "item", av.selectedItem)
 	// Check if is a day or a time entry selected
 	if av.selectedItem == nil {
-		dialog.ShowError(errors.New("no item selected"), av.window)
+		dialog.ShowError(errors.New(lang.L("noItemSelected")), av.window)
 		return
 	} else if av.selectedItem.Col == 0 {
-		dialog.ShowConfirm("Delete Entry", "Do you really want to delete this workday?", func(b bool) {
+		dialog.ShowConfirm(lang.L("deleteEntry"), lang.L("areYouSureDelete"), func(b bool) {
 			if b {
 				// Delete the whole day
 				wd := av.workday[av.selectedItem.Row]
@@ -403,12 +399,12 @@ func (av *AppView) deleteButtonFunc() {
 					// Refresh *all data*
 					av.refreshAll()
 				} else {
-					dialog.ShowError(errors.New("could not delete dataset"), av.window)
+					dialog.ShowError(errors.New(lang.L("couldNotDeleteDataset")), av.window)
 				}
 			}
 		}, av.window)
 	} else if av.selectedItem.Col == 1 {
-		dialog.ShowError(errors.New("no time selected"), av.window)
+		dialog.ShowError(errors.New(lang.L("noItemSelected")), av.window)
 	} else {
 		// Assure that there is an item selected
 		_, wt, err := av.getTimeEntry(av.selectedItem)
@@ -416,7 +412,7 @@ func (av *AppView) deleteButtonFunc() {
 		// Delete only if there is an existing item and no error
 		// Else show an error dialog
 		if wt != nil && err == nil {
-			dialog.ShowConfirm("Delete Entry", "Do you really want to delete this time entry?", func(b bool) {
+			dialog.ShowConfirm(lang.L("deleteEntry"), lang.L("areYouSureDelete"), func(b bool) {
 				if b {
 					defer av.deleteTimeEntry(wt)
 				} else {
@@ -424,7 +420,7 @@ func (av *AppView) deleteButtonFunc() {
 				}
 			}, av.window)
 		} else {
-			dialog.ShowError(errors.New("no item selected"), av.window)
+			dialog.ShowError(errors.New(lang.L("noItemSelected")), av.window)
 		}
 	}
 
@@ -434,7 +430,7 @@ func (av *AppView) deleteButtonFunc() {
 func (av *AppView) getTimeEntry(item *widget.TableCellID) (*db.Workday, *db.Worktime, error) {
 	log.Info("Get time entry", "item", item)
 	if item == nil {
-		return nil, nil, errors.New("no item selected")
+		return nil, nil, errors.New(lang.L("noItemSelected"))
 	}
 
 	// Get the affacted workday by row
@@ -457,7 +453,7 @@ func (av *AppView) getTimeEntry(item *widget.TableCellID) (*db.Workday, *db.Work
 		av.selectedItem.Col-extraColumns < len(wtList) {
 		return wd, wtList[av.selectedItem.Col-extraColumns], nil
 	} else {
-		return nil, nil, errors.New("no worktime found")
+		return nil, nil, errors.New(lang.L("noWorktimeFound"))
 	}
 }
 
@@ -472,7 +468,7 @@ func (av *AppView) editButtonFunc() {
 	// Check if is a day or a time entry selected
 	// Assure that there is an item selected
 	if av.selectedItem == nil || av.selectedItem.Col == 0 || av.selectedItem.Col == 1 {
-		dialog.ShowError(errors.New("no worktime selected"), av.window)
+		dialog.ShowError(errors.New(lang.L("noWorktimeSelected")), av.window)
 		return
 	}
 
@@ -502,24 +498,33 @@ func (av *AppView) editButtonFunc() {
 		timeEntry := widget.NewEntry()
 		timeEntry.SetText(time.Now().In(loc).Format(time.TimeOnly))
 
-		typeEntry := widget.NewSelectEntry([]string{"Begin", "End"})
-		typeEntry.SetText(wt.Type)
+		typeEntry := widget.NewSelectEntry([]string{lang.L("begin"), lang.L("end")})
+		var textType string
+		if wt.Type == "Begin" {
+			textType = lang.L("begin")
+		} else {
+			textType = lang.L("end")
+		}
+
+		typeEntry.SetText(textType)
 		typeEntry.Disable()
 
 		form := []*widget.FormItem{
-			{Text: "Time (hh:mm:ss)", Widget: timeEntry, HintText: "Old entry: " + wt.Time.Format(time.TimeOnly)},
-			{Text: "Type", Widget: typeEntry},
+			{Text: lang.L("timeWithFormat"),
+				Widget:   timeEntry,
+				HintText: lang.L("hintTextOldEntry") + ": " + wt.Time.Format(time.TimeOnly)},
+			{Text: lang.L("type"), Widget: typeEntry},
 		}
 		// Edit only if there is an existing item and no error
 		log.Debug("Edit time entry", "worktime", wt)
-		dia := dialog.NewForm("Edit Time Entry", "Edit", "Cancel", form, func(b bool) {
+		dia := dialog.NewForm(lang.L("editTimeEntry"), lang.L("edit"), lang.L("cancel"), form, func(b bool) {
 			if b {
 				log.Debug("Edit time entry", "confirmed", b, "worktime", wt)
 				// Parse the time
 				timeEntry := form[0].Widget.(*widget.Entry).Text
 
 				if timeEntry == "" {
-					dialog.ShowError(errors.New("no time entry"), av.window)
+					dialog.ShowError(errors.New(lang.L("noTimeEntry")), av.window)
 					return
 				}
 
@@ -549,13 +554,19 @@ func (av *AppView) editButtonFunc() {
 				ct := time.Now().In(loc)
 				log.Debug("Compare new-time with current-time", "new-time", nt, "current-time", ct)
 				if ct.Before(nt) {
-					dialog.ShowError(errors.New("time is in the future, do not fake 😉"), av.window)
+					dialog.ShowError(errors.New(lang.L("timeIsInFuture")), av.window)
 					return
 				}
 
 				// Update the time entry
 				wt.Time = nt
-				wt.Type = form[1].Widget.(*widget.SelectEntry).Text
+				timeType := form[1].Widget.(*widget.SelectEntry).Text
+
+				if timeType == lang.L("begin") {
+					wt.Type = "Begin"
+				} else {
+					wt.Type = "End"
+				}
 
 				if isAdd {
 					// If we are adding a time entry in the past, we have to add a new workday
@@ -577,7 +588,7 @@ func (av *AppView) editButtonFunc() {
 		dia.Resize(fyne.NewSize(400, 200))
 		dia.Show()
 	} else {
-		dialog.ShowError(errors.New("no item selected"), av.window)
+		dialog.ShowError(errors.New(lang.L("noItemSelected")), av.window)
 	}
 }
 
@@ -804,7 +815,7 @@ func (av *AppView) calculateOvertime(previousOvertime ...time.Duration) {
 			av.allOvertime = binding.NewString()
 		}
 
-		av.allOvertime.Set("Total Overtime: " + (totalOvertime + previousOvertimeTransfered).String())
+		av.allOvertime.Set(lang.L("totalOvertime") + ": " + (totalOvertime + previousOvertimeTransfered).String())
 		log.Info("Total overtime", "overtime", totalOvertime+previousOvertimeTransfered)
 	}
 }

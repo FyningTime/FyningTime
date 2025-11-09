@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2"
 
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/lang"
 
 	"fyne.io/fyne/v2/widget"
 
@@ -21,7 +22,15 @@ func GetSettingsView(w fyne.Window, a fyne.App) *dialog.FormDialog {
 	settings := service.ReadProperties(a)
 
 	firstDayOfWeekEntry := widget.NewSelectEntry(
-		[]string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"})
+		[]string{
+			lang.L("monday"),
+			lang.L("tuesday"),
+			lang.L("wednesday"),
+			lang.L("thursday"),
+			lang.L("friday"),
+			lang.L("saturday"),
+			lang.L("sunday"),
+		})
 	weekday := settings.FirstDayOfWeek
 	firstDayOfWeekEntry.SetText(model.WeekdayToString(weekday))
 
@@ -38,28 +47,27 @@ func GetSettingsView(w fyne.Window, a fyne.App) *dialog.FormDialog {
 
 	refreshTimeUi.SetText(strconv.Itoa(settings.RefreshTimeUi))
 
-	themeOptions := []string{"Auto", "Light", "Dark"}
+	themeOptions := []string{lang.L("auto"), lang.L("light"), lang.L("dark")}
 	themeSelection := widget.NewRadioGroup(themeOptions, nil)
 	switch settings.ThemeVariant {
 	case 1:
-		themeSelection.SetSelected("Dark")
+		themeSelection.SetSelected(lang.L("dark"))
 	case 2:
-		themeSelection.SetSelected("Light")
+		themeSelection.SetSelected(lang.L("light"))
 	default:
-		themeSelection.SetSelected("Auto")
+		themeSelection.SetSelected(lang.L("auto"))
 	}
 
 	form := []*widget.FormItem{
-		{Text: "Saved path", Widget: widget.NewLabel(settings.SavedPath)},
-		{Text: "DB path", Widget: widget.NewLabel(settings.SavedDbPath)},
-		{Text: "Refresh times (seconds)", Widget: refreshTimeUi},
-		{Text: "First day of week", Widget: firstDayOfWeekEntry},
-		{Text: "Week hours", Widget: weekHours},
-		{Text: "Max vacations", Widget: maxVacations},
-		{Text: "Import total overtime", Widget: importTotalOvertime},
-		{Text: "Theme", Widget: themeSelection},
+		{Text: lang.L("dbPath"), Widget: widget.NewLabel(settings.SavedDbPath)},
+		{Text: lang.L("refreshTimesInSeconds"), Widget: refreshTimeUi},
+		{Text: lang.L("firstDayOfWeek"), Widget: firstDayOfWeekEntry},
+		{Text: lang.L("weekHours"), Widget: weekHours},
+		{Text: lang.L("maxVacations"), Widget: maxVacations},
+		{Text: lang.L("importTotalOvertime"), Widget: importTotalOvertime},
+		{Text: lang.L("theme"), Widget: themeSelection},
 	}
-	dia := dialog.NewForm("Settings", "Save", "Cancel", form, func(ok bool) {
+	dia := dialog.NewForm(lang.L("settings"), lang.L("save"), lang.L("cancel"), form, func(ok bool) {
 		if ok {
 			// Save settings
 			settings.FirstDayOfWeek = model.StringToWeekday(firstDayOfWeekEntry.Text)
@@ -96,18 +104,16 @@ func GetSettingsView(w fyne.Window, a fyne.App) *dialog.FormDialog {
 			settings.RefreshTimeUi, err = strconv.Atoi(refreshTimeUi.Text)
 
 			if err != nil {
-
 				dialog.ShowError(err, w)
-
 				return
 
 			}
 
 			switch themeSelection.Selected {
-			case "Dark":
+			case lang.L("dark"):
 				settings.ThemeVariant = 1
-				a.Settings().SetTheme(apptheme.NewPastelleTheme())
-			case "Light":
+				a.Settings().SetTheme(apptheme.NewPastelleDark())
+			case lang.L("light"):
 				settings.ThemeVariant = 2
 				a.Settings().SetTheme(apptheme.NewPastelleLight())
 			default:

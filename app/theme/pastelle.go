@@ -52,9 +52,7 @@ import (
 var _ fyne.Theme = (*PastelleTheme)(nil)
 
 // PastelleTheme provides a unified theme for both variants.
-type PastelleTheme struct {
-	variant fyne.ThemeVariant
-}
+type PastelleTheme struct{}
 
 // NewPastelleTheme constructs the unified Pastelle theme.
 func NewPastelleTheme() fyne.Theme {
@@ -63,21 +61,17 @@ func NewPastelleTheme() fyne.Theme {
 
 // NewPastelleLight constructs the Pastelle Light theme.
 func NewPastelleLight() fyne.Theme {
-	return &PastelleTheme{
-		variant: fyneTheme.VariantLight,
-	}
+	return &PastelleTheme{}
 }
 
 // NewPastelleDark constructs the Pastelle Dark theme.
 func NewPastelleDark() fyne.Theme {
-	return &PastelleTheme{
-		variant: fyneTheme.VariantDark,
-	}
+	return &PastelleTheme{}
 }
 
 // Color returns a color for the given name and variant.
 func (t *PastelleTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
-	if t.variant == fyneTheme.VariantDark {
+	if v == fyneTheme.VariantDark {
 		return t.darkColor(n)
 	}
 	return t.lightColor(n)
