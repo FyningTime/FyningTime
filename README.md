@@ -18,6 +18,12 @@ FyningTime (based on the Go framework Fyne) helps to track down your work time.
 
 For more see issues tagged as feature: https://github.com/FyningTime/FyningTime/issues?q=is%3Aopen+is%3Aissue+label%3Afeature
 
+## Languages
+
+To be honest, it was translated wit ChatGPT-5. If something is wrong, please create a better PR.
+Neither I nor you do not trust machine translations 100%.
+Thanks and I am sorry for any mistakes!
+
 ## Screenshots
 
 **WIP!**
